@@ -46,7 +46,7 @@ El carrito sigue guardándose en el navegador: no necesita persistir en el servi
 ## 2. Referencia al frontend
 
 - **Repositorio de la interfaz (React + Vite):** https://github.com/vicenteehueichapan-boop/ProtecoFullstackllVolcan
-- El README del frontend enlaza a este repositorio. El frontend se mantiene en su propio repositorio, como pide la guía.
+- El README del frontend enlaza a este repositorio (al inicio). El frontend se mantiene en su propio repositorio, como pide la guía.
 
 ## 3. Decisiones técnicas
 
@@ -384,7 +384,7 @@ en el navegador con React (carga, éxito, error y sesión vencida con Vitest y m
 
 - [x] Creamos un repositorio nuevo para el backend y conservamos separado el frontend.
 - [x] El README identifica proyecto, caso, alcance e integrantes.
-- [ ] El README del backend enlaza al frontend y el del frontend enlaza al backend. *(Este README enlaza al frontend; falta integrar el enlace en el README del frontend.)*
+- [x] El README del backend enlaza al frontend y el del frontend enlaza al backend.
 - [x] Justificamos la tecnología elegida y su ejecución en EC2.
 - [x] Definimos la base de datos y mantenemos su diagrama actualizado, sin diccionario de datos.
 - [ ] Los diagramas en Drive tienen enlaces directos y acceso de lectura para el docente. *(Pendiente: subir y pegar los enlaces.)*
