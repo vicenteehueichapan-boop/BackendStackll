@@ -1,0 +1,678 @@
+openapi: 3.1.0
+info:
+  title: API Distribuidora de Gas El Volcán
+  version: 0.1.0
+  description: |
+    Contratos de la API del proyecto semestral (DSY1104). Cada operación indica su estado en
+    `x-estado`: **implementado** (se puede probar con «Try it out») o **propuesto** (contrato
+    diseñado, aún sin código; responde 404). `x-pantalla` y `x-entidades` la relacionan con el
+    frontend React y con el modelo de datos. Todos los ejemplos usan datos ficticios.
+servers:
+  - url: /
+    description: Mismo servidor que sirve esta documentación
+tags:
+  - name: Autenticación
+  - name: Productos
+  - name: Categorías
+  - name: Zonas
+  - name: Pedidos
+  - name: Usuarios
+  - name: Mensajes
+  - name: Reportes
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de POST /api/auth/login. Vence a los 15 minutos.
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [codigo, mensaje]
+          properties:
+            codigo: { type: string, example: VALIDACION }
+            mensaje: { type: string, example: Revisa los datos enviados. }
+            detalles:
+              type: object
+              additionalProperties: { type: string }
+              example: { correo: Ingresa un correo válido. }
+    RegistroEntrada:
+      type: object
+      additionalProperties: false
+      required: [nombre, apellidos, run, correo, contrasena, tipoCliente]
+      properties:
+        nombre: { type: string, minLength: 2, maxLength: 80, example: Ana }
+        apellidos: { type: string, minLength: 2, maxLength: 80, example: Pérez Soto }
+        run: { type: string, pattern: '^[0-9]{7,8}[0-9K]$', example: '12345678K', description: Sin puntos ni guion }
+        correo: { type: string, format: email, example: ana@ejemplo.cl }
+        contrasena: { type: string, minLength: 8, maxLength: 128, writeOnly: true, example: Ficticia2026 }
+        tipoCliente: { type: string, enum: [residencial, comercial] }
+        direccion: { type: string, maxLength: 200, default: '', example: Av. Libertad 123 }
+        zonaId: { type: [string, 'null'], example: centro, description: Opcional }
+    IngresoEntrada:
+      type: object
+      additionalProperties: false
+      required: [correo, contrasena]
+      properties:
+        correo: { type: string, format: email, example: ana@ejemplo.cl }
+        contrasena: { type: string, writeOnly: true, example: Ficticia2026 }
+    TokenAcceso:
+      type: object
+      description: Generado por el servidor.
+      properties:
+        accessToken: { type: string, example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.… }
+        tokenType: { type: string, const: Bearer }
+        expiresIn: { type: integer, description: Segundos de vigencia, example: 900 }
+    Usuario:
+      type: object
+      description: Todos los campos los genera o guarda el servidor. Nunca incluye el hash de la contraseña.
+      properties:
+        id: { type: string, format: uuid, readOnly: true, example: 019a6f2c-1d2e-7c3b-9a10-5b6c7d8e9f00 }
+        correo: { type: string, example: ana@ejemplo.cl }
+        nombre: { type: string, example: Ana }
+        apellidos: { type: string, example: Pérez Soto }
+        rol: { type: string, enum: [cliente, operadora, repartidor, administracion], readOnly: true }
+        perfil:
+          type: object
+          description: Solo para clientes
+          properties:
+            run: { type: string, example: '12345678K' }
+            tipoCliente: { type: string, enum: [residencial, comercial] }
+            direccion: { type: string }
+            zonaId: { type: [string, 'null'] }
+    Producto:
+      type: object
+      properties:
+        codigo: { type: string, pattern: '^[A-Z]{2}[0-9]{3}$', example: CL002 }
+        nombre: { type: string, example: Cilindro GLP 11 kg }
+        descripcion: { type: string }
+        unidad: { type: string, example: Unidad }
+        categoria: { type: string, example: Cilindros de Gas }
+        precioResidencial: { type: integer, minimum: 1, example: 12000 }
+        precioComercial: { type: integer, minimum: 1, example: 11000 }
+        stock: { type: integer, minimum: 0, example: 200 }
+        destacado: { type: boolean }
+    ProductoEntrada:
+      type: object
+      additionalProperties: false
+      required: [codigo, nombre, descripcion, unidad, categoria, precioResidencial, precioComercial, stock]
+      properties:
+        codigo: { type: string, pattern: '^[A-Z]{2}[0-9]{3}$' }
+        nombre: { type: string, minLength: 3, maxLength: 100 }
+        descripcion: { type: string, maxLength: 500 }
+        unidad: { type: string }
+        categoria: { type: string }
+        precioResidencial: { type: integer, minimum: 1 }
+        precioComercial: { type: integer, minimum: 1 }
+        stock: { type: integer, minimum: 0 }
+        destacado: { type: boolean, default: false }
+    Categoria:
+      type: object
+      properties:
+        id: { type: integer, readOnly: true, example: 1 }
+        nombre: { type: string, minLength: 3, maxLength: 60, example: Reguladores }
+    Zona:
+      type: object
+      properties:
+        id: { type: string, example: centro }
+        nombre: { type: string, example: Zona Centro }
+        comunas: { type: string }
+        dias: { type: string }
+        horario: { type: string }
+        tiempoEstimado: { type: string }
+    PedidoEntrada:
+      type: object
+      additionalProperties: false
+      description: Campos que envía el cliente. Precio, total, número, estado y dueño los calcula el servidor.
+      required: [lineas, nombre, apellidos, correo, direccion, zonaId, tipoCliente]
+      properties:
+        lineas:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [codigo, cantidad]
+            properties:
+              codigo: { type: string, example: CL002 }
+              cantidad: { type: integer, minimum: 1, example: 2 }
+        nombre: { type: string, example: Ana }
+        apellidos: { type: string, example: Pérez Soto }
+        correo: { type: string, format: email, example: ana@ejemplo.cl }
+        direccion: { type: string, example: Av. Libertad 123 }
+        zonaId: { type: string, example: centro }
+        tipoCliente: { type: string, enum: [residencial, comercial], description: Con sesión de cliente se usa el de su perfil }
+    Pedido:
+      type: object
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        numero: { type: integer, readOnly: true, example: 1024 }
+        estado: { type: string, enum: [pendiente, asignado, en_camino, entregado], readOnly: true }
+        total: { type: integer, readOnly: true, example: 24000 }
+        tipoCliente: { type: string, enum: [residencial, comercial] }
+        zonaId: { type: string }
+        lineas:
+          type: array
+          items:
+            type: object
+            properties:
+              codigo: { type: string }
+              cantidad: { type: integer }
+              precioUnitario: { type: integer, readOnly: true }
+        repartidor: { type: [string, 'null'], readOnly: true }
+        cobradoEn: { type: [string, 'null'], format: date-time, readOnly: true }
+        creadoEn: { type: string, format: date-time, readOnly: true }
+  responses:
+    Validacion:
+      description: 400 · La entrada no cumple el contrato.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NoAutenticado:
+      description: 401 · Falta el token, o es inválido, está alterado, vencido o revocado.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { codigo: SESION_INVALIDA, mensaje: La sesión no es válida o venció. Inicia sesión nuevamente. } }
+    SinPermiso:
+      description: 403 · Usuario autenticado sin permiso para la acción o el registro.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { codigo: PERMISO_DENEGADO, mensaje: No tienes permiso para realizar esta acción. } }
+    NoEncontrado:
+      description: 404 · El recurso no existe.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflicto:
+      description: 409 · Choca con una restricción del negocio.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+paths:
+  /api/auth/register:
+    post:
+      tags: [Autenticación]
+      summary: Registrar un cliente
+      description: Crea siempre una cuenta con rol cliente (lo asigna el servidor). Rechaza campos extra como «rol». La contraseña se guarda solo como hash Argon2id.
+      x-estado: implementado
+      x-pantalla: Registro (/registro)
+      x-entidades: [usuario, perfil_cliente]
+      x-permisos: Público
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RegistroEntrada' } } }
+      responses:
+        '201': { description: Cuenta creada, content: { application/json: { schema: { $ref: '#/components/schemas/Usuario' } } } }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '409':
+          description: 409 · Correo o RUN ya registrados.
+          content:
+            application/json:
+              example: { error: { codigo: CUENTA_EXISTENTE, mensaje: Ya existe una cuenta con ese correo o RUN. } }
+        '429': { description: Demasiadas solicitudes desde la misma IP }
+  /api/auth/login:
+    post:
+      tags: [Autenticación]
+      summary: Iniciar sesión
+      description: Verifica el hash y emite un JWT HS256 (sub, iss, aud, iat, exp, jti, ver). Ante cualquier falla responde el mismo mensaje genérico. Máximo 5 intentos fallidos cada 15 minutos por cuenta y 20 por IP.
+      x-estado: implementado
+      x-pantalla: Ingreso (/ingreso) y Acceso del personal (/personal)
+      x-entidades: [usuario]
+      x-permisos: Público
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/IngresoEntrada' } } }
+      responses:
+        '200': { description: Acceso correcto, content: { application/json: { schema: { $ref: '#/components/schemas/TokenAcceso' } } } }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401':
+          description: 401 · Credenciales incorrectas (no revela si la cuenta existe).
+          content:
+            application/json:
+              example: { error: { codigo: CREDENCIALES_INVALIDAS, mensaje: Correo o contraseña incorrectos. } }
+        '429':
+          description: 429 · Demasiados intentos fallidos.
+          content:
+            application/json:
+              example: { error: { codigo: DEMASIADOS_INTENTOS, mensaje: Demasiados intentos de ingreso. Espera unos minutos y vuelve a intentarlo. } }
+  /api/auth/me:
+    get:
+      tags: [Autenticación]
+      summary: Perfil del usuario autenticado
+      description: La identidad sale del token validado, nunca de un id enviado por el cliente.
+      x-estado: implementado
+      x-pantalla: Barra de navegación, Mis pedidos, Confirmar pedido (autocompletar), Perfil de administración
+      x-entidades: [usuario, perfil_cliente]
+      x-permisos: Cualquier usuario autenticado
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Perfil, content: { application/json: { schema: { $ref: '#/components/schemas/Usuario' } } } }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    patch:
+      tags: [Autenticación]
+      summary: Editar el propio nombre (RF25)
+      x-estado: propuesto
+      x-pantalla: Perfil de administración
+      x-entidades: [usuario]
+      x-permisos: Cualquier usuario autenticado, solo sobre sí mismo
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { nombre: { type: string }, apellidos: { type: string } } } } }
+      responses:
+        '200': { description: Perfil actualizado }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+  /api/auth/logout:
+    post:
+      tags: [Autenticación]
+      summary: Cerrar sesión
+      description: Incrementa la versión de sesión del usuario; todos sus tokens emitidos dejan de ser aceptados de inmediato.
+      x-estado: implementado
+      x-pantalla: Botón «Cerrar sesión»
+      x-entidades: [usuario]
+      x-permisos: Cualquier usuario autenticado
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Sesión cerrada }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /api/productos:
+    get:
+      tags: [Productos]
+      summary: Catálogo de productos activos (RF02, RF04, RF05)
+      x-estado: implementado
+      x-pantalla: Catálogo, Categorías, Destacados, Inicio
+      x-entidades: [producto, categoria]
+      x-permisos: Público
+      parameters:
+        - { name: busqueda, in: query, schema: { type: string, maxLength: 60 }, description: Busca en nombre, código o descripción }
+        - { name: categoria, in: query, schema: { type: string }, example: Reguladores }
+      responses:
+        '200':
+          description: Lista ordenada por código (máximo 100)
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Producto' } } } }
+        '400': { $ref: '#/components/responses/Validacion' }
+    post:
+      tags: [Productos]
+      summary: Crear producto (RF19)
+      x-estado: propuesto
+      x-pantalla: Administración › Productos
+      x-entidades: [producto, categoria]
+      x-permisos: administracion
+      security: [{ bearerAuth: [] }]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/ProductoEntrada' } } } }
+      responses:
+        '201': { description: Creado, content: { application/json: { schema: { $ref: '#/components/schemas/Producto' } } } }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '409': { description: Código ya existente }
+  /api/productos/{codigo}:
+    parameters:
+      - { name: codigo, in: path, required: true, schema: { type: string, pattern: '^[A-Z]{2}[0-9]{3}$' }, example: CL002 }
+    get:
+      tags: [Productos]
+      summary: Detalle de un producto (RF03)
+      x-estado: implementado
+      x-pantalla: Detalle de producto (/productos/:codigo)
+      x-entidades: [producto, categoria]
+      x-permisos: Público
+      responses:
+        '200': { description: Producto, content: { application/json: { schema: { $ref: '#/components/schemas/Producto' } } } }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    put:
+      tags: [Productos]
+      summary: Editar producto (RF19)
+      x-estado: propuesto
+      x-pantalla: Administración › Productos
+      x-entidades: [producto]
+      x-permisos: administracion
+      security: [{ bearerAuth: [] }]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/ProductoEntrada' } } } }
+      responses:
+        '200': { description: Actualizado }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    delete:
+      tags: [Productos]
+      summary: Eliminar producto (RF19)
+      description: Si el producto aparece en pedidos no se borra (FK RESTRICT); se responde 409 y se ofrece retirarlo del catálogo.
+      x-estado: propuesto
+      x-pantalla: Administración › Productos
+      x-entidades: [producto, linea_pedido]
+      x-permisos: administracion
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { description: Tiene pedidos asociados }
+  /api/productos/{codigo}/stock:
+    patch:
+      tags: [Productos]
+      summary: Reponer stock de un producto crítico (RF20)
+      x-estado: propuesto
+      x-pantalla: Administración › Productos críticos
+      x-entidades: [producto]
+      x-permisos: administracion
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: codigo, in: path, required: true, schema: { type: string } }
+      requestBody: { content: { application/json: { schema: { type: object, required: [cantidad], properties: { cantidad: { type: integer, minimum: 1 } } } } } }
+      responses:
+        '200': { description: Stock actualizado }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /api/categorias:
+    get:
+      tags: [Categorías]
+      summary: Listar categorías
+      x-estado: propuesto
+      x-pantalla: Catálogo (filtro), Administración › Categorías
+      x-entidades: [categoria]
+      x-permisos: Público
+      responses:
+        '200': { description: Lista, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Categoria' } } } } }
+    post:
+      tags: [Categorías]
+      summary: Crear categoría (RF21)
+      description: No existe DELETE porque el ERS solo pide crear y editar; además una categoría con productos no se puede borrar (FK RESTRICT).
+      x-estado: propuesto
+      x-pantalla: Administración › Categorías
+      x-entidades: [categoria]
+      x-permisos: administracion
+      security: [{ bearerAuth: [] }]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/Categoria' } } } }
+      responses:
+        '201': { description: Creada }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '409': { description: Nombre repetido }
+  /api/categorias/{id}:
+    put:
+      tags: [Categorías]
+      summary: Renombrar categoría (RF21; sus productos la siguen por FK)
+      x-estado: propuesto
+      x-pantalla: Administración › Categorías
+      x-entidades: [categoria]
+      x-permisos: administracion
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/Categoria' } } } }
+      responses:
+        '200': { description: Actualizada }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { description: Nombre repetido }
+
+  /api/zonas:
+    get:
+      tags: [Zonas]
+      summary: Zonas de despacho (RF01, RF09)
+      x-estado: propuesto
+      x-pantalla: Inicio, Confirmar pedido, Registro
+      x-entidades: [zona_despacho]
+      x-permisos: Público
+      responses:
+        '200': { description: Lista, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Zona' } } } } }
+
+  /api/pedidos:
+    post:
+      tags: [Pedidos]
+      summary: Confirmar un pedido (RF09, RF10, RF16) · operación principal
+      description: |
+        En una transacción: valida que cada producto exista y esté activo, toma el precio vigente según
+        la tarifa, descuenta el stock con `UPDATE … WHERE stock >= cantidad` y guarda el pedido con sus líneas.
+        Si una línea no alcanza stock, nada se guarda y responde 409. Con token de cliente, el pedido queda
+        asociado a su cuenta y la tarifa sale de su perfil.
+      x-estado: propuesto
+      x-pantalla: Confirmar pedido → Pedido confirmado
+      x-entidades: [pedido, linea_pedido, producto, zona_despacho, usuario]
+      x-permisos: Público (visitante) o cliente autenticado
+      security: [{}, { bearerAuth: [] }]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/PedidoEntrada' } } } }
+      responses:
+        '201': { description: Pedido creado, content: { application/json: { schema: { $ref: '#/components/schemas/Pedido' } } } }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '409':
+          description: 409 · Stock insuficiente o producto retirado.
+          content:
+            application/json:
+              example: { error: { codigo: STOCK_INSUFICIENTE, mensaje: No hay stock suficiente de CL002., detalles: { CL002: 'Disponible: 1' } } }
+    get:
+      tags: [Pedidos]
+      summary: Pedidos recibidos (RF13, RF18)
+      x-estado: propuesto
+      x-pantalla: Operadora › Pedidos, Administración › Pedidos
+      x-entidades: [pedido]
+      x-permisos: operadora, administracion
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: estado, in: query, schema: { type: string, enum: [pendiente, asignado, en_camino, entregado] } }
+        - { name: desde, in: query, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Lista, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Pedido' } } } } }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /api/pedidos/mios:
+    get:
+      tags: [Pedidos]
+      summary: Historial del cliente autenticado (RF12)
+      description: Filtra por el id del token; el cliente no puede pedir los de otra persona.
+      x-estado: propuesto
+      x-pantalla: Mis pedidos
+      x-entidades: [pedido]
+      x-permisos: cliente
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Lista, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Pedido' } } } } }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /api/pedidos/asignados:
+    get:
+      tags: [Pedidos]
+      summary: Entregas del repartidor autenticado (RF14)
+      x-estado: propuesto
+      x-pantalla: Repartidor › Entregas
+      x-entidades: [pedido]
+      x-permisos: repartidor (solo los suyos)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Lista }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+  /api/pedidos/seguimiento:
+    post:
+      tags: [Pedidos]
+      summary: Seguimiento con número y correo (RF11, regla 7)
+      description: Se usa POST para que el correo no viaje en la URL. Si número y correo no coinciden responde 404, sin revelar si el pedido existe.
+      x-estado: propuesto
+      x-pantalla: Seguimiento de pedido
+      x-entidades: [pedido]
+      x-permisos: Público
+      requestBody: { content: { application/json: { schema: { type: object, required: [numero, correo], properties: { numero: { type: integer }, correo: { type: string } } } } } }
+      responses:
+        '200': { description: Estado del pedido }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /api/pedidos/{id}:
+    get:
+      tags: [Pedidos]
+      summary: Detalle de un pedido (anti-IDOR)
+      description: Solo su dueño (usuario del token), el repartidor asignado, la operadora o administración. Para un cliente que pide un pedido ajeno se responde 404, sin confirmar que existe.
+      x-estado: propuesto
+      x-pantalla: Seguimiento, Orden de pedido (administración)
+      x-entidades: [pedido, linea_pedido]
+      x-permisos: dueño, repartidor asignado, operadora, administracion
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Pedido, content: { application/json: { schema: { $ref: '#/components/schemas/Pedido' } } } }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /api/pedidos/{id}/asignacion:
+    patch:
+      tags: [Pedidos]
+      summary: Asignar repartidor (RF13, regla 6)
+      x-estado: propuesto
+      x-pantalla: Operadora › Pedidos
+      x-entidades: [pedido, usuario]
+      x-permisos: operadora
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody: { content: { application/json: { schema: { type: object, required: [repartidorId], properties: { repartidorId: { type: string, format: uuid } } } } } }
+      responses:
+        '200': { description: Asignado }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { description: El pedido ya no está pendiente o el repartidor no está activo }
+  /api/pedidos/{id}/estado:
+    patch:
+      tags: [Pedidos]
+      summary: Avanzar estado (RF14, RF15, regla 5)
+      description: Solo el siguiente estado válido. Al pasar a «entregado» el servidor registra el cobro en efectivo.
+      x-estado: propuesto
+      x-pantalla: Repartidor › Entregas
+      x-entidades: [pedido]
+      x-permisos: repartidor asignado a ese pedido
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody: { content: { application/json: { schema: { type: object, required: [estado], properties: { estado: { type: string, enum: [en_camino, entregado] } } } } } }
+      responses:
+        '200': { description: Estado actualizado }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { description: Salto o retroceso de estado }
+
+  /api/usuarios:
+    get:
+      tags: [Usuarios]
+      summary: Listar clientes y personal (RF22)
+      x-estado: propuesto
+      x-pantalla: Administración › Usuarios
+      x-entidades: [usuario, perfil_cliente]
+      x-permisos: administracion
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: rol, in: query, schema: { type: string, enum: [cliente, operadora, repartidor, administracion] } }
+      responses:
+        '200': { description: Lista de usuarios (sin hashes), content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Usuario' } } } } }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+    post:
+      tags: [Usuarios]
+      summary: Crear personal con su rol (RF22)
+      description: Única forma de crear operadoras, repartidores y administradores. Solo administración asigna roles.
+      x-estado: propuesto
+      x-pantalla: Administración › Usuarios
+      x-entidades: [usuario]
+      x-permisos: administracion
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Creado }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '409': { description: Correo repetido }
+  /api/usuarios/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Usuarios]
+      summary: Ficha con historial de pedidos o entregas (RF23)
+      x-estado: propuesto
+      x-pantalla: Detalle de cliente o de personal
+      x-entidades: [usuario, pedido]
+      x-permisos: administracion
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Ficha }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Usuarios]
+      summary: Editar, cambiar rol o deshabilitar (RF22, regla 8)
+      description: Deshabilitar incrementa la versión de sesión (revoca sus tokens). Responde 409 si dejaría al sistema sin administración activa.
+      x-estado: propuesto
+      x-pantalla: Administración › Usuarios
+      x-entidades: [usuario]
+      x-permisos: administracion
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Actualizado }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { description: Quedaría sin administración activa }
+
+  /api/mensajes:
+    post:
+      tags: [Mensajes]
+      summary: Enviar mensaje de contacto (RF06)
+      x-estado: propuesto
+      x-pantalla: Contacto
+      x-entidades: [mensaje_contacto]
+      x-permisos: Público
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre, correo, motivo, mensaje]
+              properties:
+                nombre: { type: string, minLength: 3 }
+                correo: { type: string, format: email }
+                motivo: { type: string, enum: [Consulta de productos, Cobertura y horarios, Estado de un pedido, Otro] }
+                mensaje: { type: string, minLength: 10, maxLength: 500 }
+      responses:
+        '201': { description: Recibido }
+        '400': { $ref: '#/components/responses/Validacion' }
+    get:
+      tags: [Mensajes]
+      summary: Leer mensajes recibidos
+      x-estado: propuesto
+      x-pantalla: Administración
+      x-entidades: [mensaje_contacto]
+      x-permisos: administracion
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Lista }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /api/reportes/resumen:
+    get:
+      tags: [Reportes]
+      summary: Reportes calculados desde los pedidos (RF17, RF24)
+      x-estado: propuesto
+      x-pantalla: Administración › Panel y Reportes
+      x-entidades: [pedido, linea_pedido, producto]
+      x-permisos: administracion
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Efectivo registrado, por cobrar, pedidos por estado, zona y tarifa, y productos más pedidos }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }

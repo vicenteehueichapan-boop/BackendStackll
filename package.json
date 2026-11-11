@@ -1,0 +1,37 @@
+{
+  "name": "gas-el-volcan-api",
+  "version": "0.1.0",
+  "description": "API REST de la Distribuidora de Gas El Volcán: catálogo, pedidos e inicio de sesión con JWT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "start": "node --env-file=.env src/server.js",
+    "dev": "node --env-file=.env --watch src/server.js",
+    "migrar": "node --env-file=.env scripts/migrar.js",
+    "sembrar": "node --env-file=.env scripts/sembrar.js",
+    "test": "vitest run",
+    "lint": "oxlint src scripts tests"
+  },
+  "dependencies": {
+    "argon2": "^0.45.2",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.4",
+    "helmet": "^8.3.0",
+    "jose": "^6.2.17",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "oxlint": "^1.93.0",
+    "supertest": "^7.3.2",
+    "vitest": "^5.1.0"
+  }
+}

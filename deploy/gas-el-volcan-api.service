@@ -1,0 +1,22 @@
+# Servicio systemd: mantiene la API activa en EC2, la inicia al encender la instancia
+# y la reinicia si se detiene por un error.
+# Instalar: sudo cp deploy/gas-el-volcan-api.service /etc/systemd/system/
+#           sudo systemctl daemon-reload && sudo systemctl enable --now gas-el-volcan-api
+[Unit]
+Description=API REST Gas El Volcán (Node.js + Express)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/BackendStackll
+ExecStart=/usr/bin/node --env-file=/home/ubuntu/BackendStackll/.env src/server.js
+Restart=on-failure
+RestartSec=5
+# El proceso no puede ganar privilegios ni ver el /tmp de otros servicios.
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
