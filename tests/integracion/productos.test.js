@@ -32,6 +32,15 @@ describe('catálogo', () => {
 });
 
 describe('documentación viva', () => {
+  it('permite los recursos de Swagger por HTTP de laboratorio y conserva la política HTTPS', async () => {
+    const http = await request(app).get('/api/v1/docs/').expect(200);
+    expect(http.headers['content-security-policy']).not.toContain('upgrade-insecure-requests');
+    expect(http.headers['content-security-policy']).toContain("script-src 'self'");
+    expect(http.headers['cross-origin-opener-policy']).toBeUndefined();
+    const https = await request(app).get('/api/v1/docs/').set('X-Forwarded-Proto', 'https').expect(200);
+    expect(https.headers['content-security-policy']).toContain('upgrade-insecure-requests');
+    expect(https.headers['cross-origin-opener-policy']).toBe('same-origin');
+  });
   it('publica la especificación OpenAPI y Swagger UI', async () => {
     const { body } = await request(app).get('/api/v1/openapi.json').expect(200);
     expect(body.paths['/api/v1/auth/login'].post['x-estado']).toBe('implementado');

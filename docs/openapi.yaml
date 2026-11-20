@@ -2,9 +2,9 @@ openapi: 3.1.0
 info:
   title: API Gas El Volcán · Evaluación Parcial 3
   version: 0.2.0
-  description: Usuarios, autenticación y roles, catálogo y pedidos. API
-    versionada. Precio, total, identidad y permisos se comprueban en el
-    servidor. Los datos iniciales provienen del catálogo del caso.
+  description: Usuarios, autenticación y roles, catálogo y pedidos. API versionada. Precio, total,
+    identidad y permisos se comprueban en el servidor. Los datos iniciales provienen del catálogo
+    del caso.
 servers:
   - url: /
     description: Servidor actual
@@ -20,8 +20,8 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Token de POST /api/v1/auth/login; vigencia 15 minutos. El cierre de
-        sesión y los cambios de usuario revocan los tokens.
+      description: Token de POST /api/v1/auth/login; vigencia 15 minutos. El cierre de sesión y los
+        cambios de usuario revocan los tokens.
   schemas:
     Error:
       type: object
@@ -76,6 +76,7 @@ components:
           type: string
           format: email
           example: ana@ejemplo.cl
+          maxLength: 254
         contrasena: &a4
           type: string
           minLength: 8
@@ -98,6 +99,7 @@ components:
             - "null"
           example: centro
           description: Opcional
+          pattern: ^[a-z]+$
     IngresoEntrada:
       type: object
       additionalProperties: false
@@ -109,10 +111,13 @@ components:
           type: string
           format: email
           example: ana@ejemplo.cl
+          maxLength: 254
         contrasena:
           type: string
           writeOnly: true
           example: Ficticia2026
+          minLength: 1
+          maxLength: 128
     TokenAcceso:
       type: object
       description: Generado por el servidor.
@@ -127,26 +132,31 @@ components:
           type: integer
           description: Segundos de vigencia
           example: 900
+      required:
+        - accessToken
+        - tokenType
+        - expiresIn
     Usuario:
       type: object
-      description: Todos los campos los genera o guarda el servidor. Nunca incluye el
-        hash de la contraseña.
+      description: Datos públicos de la cuenta, sin hash ni versión de sesión. GET /auth/me agrega perfil
+        para clientes; el CRUD de usuarios incluye estado. El registro público devuelve id, correo,
+        nombre, apellidos y rol.
       properties:
         id:
           type: string
           format: uuid
           readOnly: true
           example: 019a6f2c-1d2e-7c3b-9a10-5b6c7d8e9f00
-        correo: &a7
+        correo:
           type: string
           example: ana@ejemplo.cl
-        nombre: &a5
+        nombre:
           type: string
           example: Ana
-        apellidos: &a6
+        apellidos:
           type: string
           example: Pérez Soto
-        rol: &a8
+        rol: &a5
           type: string
           enum:
             - cliente
@@ -172,7 +182,7 @@ components:
               type:
                 - string
                 - "null"
-        estado: &a9
+        estado: &a6
           type: string
           enum:
             - activo
@@ -225,6 +235,7 @@ components:
         codigo:
           type: string
           pattern: ^[A-Z]{2}[0-9]{3}$
+          example: ZZ993
         nombre:
           type: string
           minLength: 3
@@ -234,17 +245,27 @@ components:
           maxLength: 500
         unidad:
           type: string
+          minLength: 1
+          maxLength: 50
+          example: Unidad
         categoria:
           type: string
+          minLength: 3
+          maxLength: 60
+          example: Cilindros de Gas
+          description: Nombre de una categoría existente, obtenida con GET /api/v1/categorias.
         precioResidencial:
           type: integer
           minimum: 1
+          maximum: 2147483647
         precioComercial:
           type: integer
           minimum: 1
+          maximum: 2147483647
         stock:
           type: integer
           minimum: 0
+          maximum: 2147483647
         destacado:
           type: boolean
           default: false
@@ -280,9 +301,8 @@ components:
     PedidoEntrada:
       type: object
       additionalProperties: false
-      description: Solicitud de una cuenta cliente. El dueño sale del JWT y la tarifa
-        del perfil en la base. Se reservan stock y precio vigente en una
-        transacción.
+      description: Solicitud de una cuenta cliente. El dueño sale del JWT y la tarifa del perfil en la
+        base. Se reservan stock y precio vigente en una transacción.
       required:
         - lineas
         - nombre
@@ -305,39 +325,53 @@ components:
               codigo:
                 type: string
                 example: CL002
+                pattern: ^[A-Z]{2}[0-9]{3}$
               cantidad:
                 type: integer
                 minimum: 1
                 example: 2
+                maximum: 10000
               precioEsperado:
                 type: integer
                 minimum: 1
-                description: Precio mostrado en el resumen. Se compara con el vigente; un cambio
-                  produce 409. El servidor calcula el total.
+                description: Precio mostrado en el resumen. Se compara con el vigente; un cambio produce 409. El
+                  servidor calcula el total.
+                maximum: 2147483647
+                example: 12000
             additionalProperties: false
           maxItems: 100
+          description: Entre 1 y 100 productos, sin códigos repetidos.
         nombre:
           type: string
+          minLength: 2
+          maxLength: 80
           example: Ana
         apellidos:
           type: string
+          minLength: 2
+          maxLength: 80
           example: Pérez Soto
         correo:
           type: string
           format: email
           example: ana@ejemplo.cl
+          maxLength: 254
         direccion:
           type: string
           example: Av. Libertad 123
+          minLength: 5
+          maxLength: 200
         zonaId:
           type: string
           example: centro
+          pattern: ^[a-z]+$
         tipoCliente:
           type: string
           enum:
             - residencial
             - comercial
-          description: Con sesión de cliente se usa el de su perfil
+          description: Campo requerido del DTO de React; el servidor utiliza la tarifa del perfil guardado, no
+            confía en este valor para calcular el pedido.
     Pedido:
       type: object
       properties:
@@ -438,11 +472,23 @@ components:
       additionalProperties: false
       minProperties: 1
       properties:
-        nombre: *a5
-        apellidos: *a6
-        correo: *a7
-        rol: *a8
-        estado: *a9
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 80
+          example: Ana
+        apellidos:
+          type: string
+          minLength: 2
+          maxLength: 80
+          example: Pérez Soto
+        correo:
+          type: string
+          format: email
+          example: ana@ejemplo.cl
+          maxLength: 254
+        rol: *a5
+        estado: *a6
     AsignacionEntrada:
       type: object
       additionalProperties: false
@@ -463,6 +509,20 @@ components:
           enum:
             - en_camino
             - entregado
+    Repartidor:
+      type: object
+      required:
+        - id
+        - nombre
+        - apellidos
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        apellidos:
+          type: string
   responses:
     Error400:
       description: Datos inválidos.
@@ -506,14 +566,21 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    Error413:
+      description: El JSON supera el máximo de 20 kB permitido por la API.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
 paths:
   /api/v1/auth/register:
     post:
       tags:
         - Autenticación
       summary: Registrar un cliente
-      description: Crea siempre una cuenta con rol cliente (lo asigna el servidor).
-        Rechaza campos extra como «rol». La contraseña se guarda solo como hash
+      description: Acceso público. El servidor asigna siempre el rol cliente; no acepta rol ni
+        identificador enviados por quien se registra. Crea siempre una cuenta con rol cliente (lo
+        asigna el servidor). Rechaza campos extra como «rol». La contraseña se guarda solo como hash
         Argon2id.
       x-estado: implementado
       x-pantalla: Registro (/registro)
@@ -536,14 +603,10 @@ paths:
                 $ref: "#/components/schemas/Usuario"
         "400":
           $ref: "#/components/responses/Error400"
-        "401":
-          $ref: "#/components/responses/Error401"
-        "403":
-          $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
+        "413":
+          $ref: "#/components/responses/Error413"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -553,9 +616,10 @@ paths:
       tags:
         - Autenticación
       summary: Iniciar sesión
-      description: Verifica el hash y emite un JWT HS256 (sub, iss, aud, iat, exp,
-        jti, ver). Ante cualquier falla responde el mismo mensaje genérico.
-        Máximo 5 intentos fallidos cada 15 minutos por cuenta y 20 por IP.
+      description: Acceso público. La respuesta contiene únicamente accessToken, tokenType y expiresIn; el
+        perfil se consulta después en GET /api/v1/auth/me. Verifica el hash y emite un JWT HS256
+        (sub, iss, aud, iat, exp, jti, ver). Ante cualquier falla responde el mismo mensaje
+        genérico. Máximo 5 intentos fallidos cada 15 minutos por cuenta y 20 por IP.
       x-estado: implementado
       x-pantalla: Ingreso (/ingreso) y Acceso del personal (/personal)
       x-entidades:
@@ -577,13 +641,14 @@ paths:
         "400":
           $ref: "#/components/responses/Error400"
         "401":
-          $ref: "#/components/responses/Error401"
-        "403":
-          $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
+          description: Correo o contraseña incorrectos. Mismo mensaje genérico exista o no la cuenta, o si
+            está deshabilitada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          $ref: "#/components/responses/Error413"
         "429":
           $ref: "#/components/responses/Error429"
         "500":
@@ -593,8 +658,9 @@ paths:
       tags:
         - Autenticación
       summary: Cerrar sesión
-      description: Incrementa la versión de sesión del usuario; todos sus tokens
-        emitidos dejan de ser aceptados de inmediato.
+      description: Cualquier cuenta autenticada. Revoca todos los tokens anteriores de la cuenta mediante
+        version_sesion; no requiere refresh token. Incrementa la versión de sesión del usuario;
+        todos sus tokens emitidos dejan de ser aceptados de inmediato.
       x-estado: implementado
       x-pantalla: Botón «Cerrar sesión»
       x-entidades:
@@ -605,18 +671,8 @@ paths:
       responses:
         "204":
           description: Sesión cerrada
-        "400":
-          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
-        "403":
-          $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
   /api/v1/auth/me:
@@ -635,20 +691,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Usuario"
-        "400":
-          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
-        "403":
-          $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Cualquier cuenta autenticada. La identidad procede del JWT verificado; no recibe un
+        identificador de otra persona.
   /api/v1/productos:
     get:
       tags:
@@ -679,18 +727,10 @@ paths:
                   $ref: "#/components/schemas/Producto"
         "400":
           $ref: "#/components/responses/Error400"
-        "401":
-          $ref: "#/components/responses/Error401"
-        "403":
-          $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Acceso público. La lista contiene productos activos; sin coincidencias devuelve un
+        arreglo vacío. Solo admite los filtros busqueda y categoria.
     post:
       tags:
         - Productos
@@ -705,6 +745,16 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/ProductoEntrada"
+            example:
+              codigo: ZZ993
+              nombre: Cilindro de demostración
+              descripcion: Datos ficticios para comprobar el CRUD.
+              unidad: Unidad
+              categoria: Cilindros de Gas
+              precioResidencial: 12000
+              precioComercial: 11000
+              stock: 4
+              destacado: false
       responses:
         "201":
           description: Creado.
@@ -718,14 +768,13 @@ paths:
           $ref: "#/components/responses/Error401"
         "403":
           $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
+        "413":
+          $ref: "#/components/responses/Error413"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Solo administración. La categoría debe existir; un código duplicado produce 409.
   /api/v1/productos/{codigo}:
     get:
       tags:
@@ -740,6 +789,8 @@ paths:
           required: true
           schema:
             type: string
+            pattern: ^[A-Z]{2}[0-9]{3}$
+            example: CL002
       responses:
         "200":
           description: Operación realizada.
@@ -749,18 +800,12 @@ paths:
                 $ref: "#/components/schemas/Producto"
         "400":
           $ref: "#/components/responses/Error400"
-        "401":
-          $ref: "#/components/responses/Error401"
-        "403":
-          $ref: "#/components/responses/Error403"
         "404":
           $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Acceso público. Un código con formato inválido produce 400; un producto inexistente o
+        retirado produce 404.
     put:
       tags:
         - Productos
@@ -775,12 +820,24 @@ paths:
           required: true
           schema:
             type: string
+            pattern: ^[A-Z]{2}[0-9]{3}$
+            example: CL002
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/ProductoEntrada"
+            example:
+              codigo: CL002
+              nombre: Cilindro de demostración
+              descripcion: Datos ficticios para comprobar el CRUD.
+              unidad: Unidad
+              categoria: Cilindros de Gas
+              precioResidencial: 12000
+              precioComercial: 11000
+              stock: 4
+              destacado: false
       responses:
         "200":
           description: Operación realizada.
@@ -798,10 +855,12 @@ paths:
           $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
+        "413":
+          $ref: "#/components/responses/Error413"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Solo administración. Reemplaza los campos editables del producto activo; el código del
+        cuerpo debe coincidir con el de la ruta. La categoría debe existir.
     delete:
       tags:
         - Productos
@@ -816,6 +875,8 @@ paths:
           required: true
           schema:
             type: string
+            pattern: ^[A-Z]{2}[0-9]{3}$
+            example: CL002
       responses:
         "204":
           description: Operación realizada, sin cuerpo.
@@ -829,10 +890,10 @@ paths:
           $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Solo administración. Elimina un producto activo sin referencias. Si participa en líneas
+        de pedido devuelve 409 y conserva el registro.
   /api/v1/usuarios:
     get:
       tags:
@@ -851,20 +912,14 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Usuario"
-        "400":
-          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
         "403":
           $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Solo administración. Devuelve los datos públicos de cuentas activas y deshabilitadas,
+        sin hashes ni versiones de sesión.
     post:
       tags:
         - Usuarios
@@ -892,14 +947,14 @@ paths:
           $ref: "#/components/responses/Error401"
         "403":
           $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
+        "413":
+          $ref: "#/components/responses/Error413"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Solo administración. Crea personal con rol operadora, repartidor o administracion. Los
+        clientes se crean mediante el registro público.
   /api/v1/usuarios/{id}:
     get:
       tags:
@@ -931,12 +986,10 @@ paths:
           $ref: "#/components/responses/Error403"
         "404":
           $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Solo el propietario o administración. Cambiar el identificador para consultar otra
+        cuenta produce 403; si el actor autorizado consulta una inexistente, 404.
     patch:
       tags:
         - Usuarios
@@ -975,10 +1028,13 @@ paths:
           $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
+        "413":
+          $ref: "#/components/responses/Error413"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Solo administración. Acepta al menos un campo permitido. Los cambios revocan las
+        sesiones anteriores. Devuelve 409 si deja sin administrador activo, convierte cliente en
+        personal o a la inversa, o retira a un repartidor con entregas pendientes.
     delete:
       tags:
         - Usuarios
@@ -1007,10 +1063,11 @@ paths:
           $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: "Solo administración. Baja lógica: conserva la cuenta y sus relaciones, cambia su
+        estado a deshabilitado y revoca sus sesiones. No permite deshabilitar al último
+        administrador activo ni a un repartidor con entregas pendientes (409)."
   /api/v1/pedidos:
     get:
       tags:
@@ -1029,20 +1086,12 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Pedido"
-        "400":
-          $ref: "#/components/responses/Error400"
         "401":
           $ref: "#/components/responses/Error401"
-        "403":
-          $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: "Requiere sesión. Cliente: solo pedidos propios. Repartidor: solo asignados a su
+        cuenta. Operadora y administración: todos. Sin registros devuelve un arreglo vacío."
     post:
       tags:
         - Pedidos
@@ -1057,6 +1106,17 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/PedidoEntrada"
+            example:
+              nombre: Ana
+              apellidos: Pérez Soto
+              correo: ana@ejemplo.cl
+              direccion: Av. Libertad 123
+              zonaId: centro
+              tipoCliente: residencial
+              lineas:
+                - codigo: CL002
+                  cantidad: 1
+                  precioEsperado: 12000
       responses:
         "201":
           description: Creado.
@@ -1070,14 +1130,16 @@ paths:
           $ref: "#/components/responses/Error401"
         "403":
           $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
+        "413":
+          $ref: "#/components/responses/Error413"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Solo cliente autenticado. El propietario y la tarifa proceden de su identidad y perfil.
+        El servidor calcula precios y total, reserva stock y guarda pedido/líneas en una
+        transacción. Un cambio de precio, producto no disponible o stock insuficiente produce 409
+        sin guardar un pedido parcial.
   /api/v1/pedidos/{id}:
     get:
       tags:
@@ -1109,12 +1171,10 @@ paths:
           $ref: "#/components/responses/Error403"
         "404":
           $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Cliente propietario, repartidor asignado, operadora o administración. Un pedido ajeno
+        al cliente/repartidor produce 403.
     delete:
       tags:
         - Pedidos
@@ -1143,10 +1203,11 @@ paths:
           $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Cliente propietario, operadora o administración. Solo elimina un pedido pendiente sin
+        asignar y devuelve su stock dentro de una transacción. Asignado, en camino o entregado
+        produce 409.
   /api/v1/pedidos/{id}/asignacion:
     patch:
       tags:
@@ -1186,10 +1247,12 @@ paths:
           $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
+        "413":
+          $ref: "#/components/responses/Error413"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Solo operadora o administración. Asigna un repartidor activo a un pedido pendiente.
+        Pedido fuera de estado o repartidor no disponible produce 409.
   /api/v1/pedidos/{id}/estado:
     patch:
       tags:
@@ -1229,10 +1292,13 @@ paths:
           $ref: "#/components/responses/Error404"
         "409":
           $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
+        "413":
+          $ref: "#/components/responses/Error413"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Operadora, administración o repartidor asignado. Solo permite asignado a en_camino y
+        en_camino a entregado. Sin repartidor asignado o salto de estado produce 409; un repartidor
+        ajeno recibe 403. Al entregar se registra el cobro en efectivo.
   /api/v1/categorias:
     get:
       tags:
@@ -1250,20 +1316,10 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Categoria"
-        "400":
-          $ref: "#/components/responses/Error400"
-        "401":
-          $ref: "#/components/responses/Error401"
-        "403":
-          $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Acceso público de lectura para catálogo y formularios. No implementa mantenimiento de
+        categorías en EP3.
   /api/v1/zonas:
     get:
       tags:
@@ -1281,20 +1337,9 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Zona"
-        "400":
-          $ref: "#/components/responses/Error400"
-        "401":
-          $ref: "#/components/responses/Error401"
-        "403":
-          $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Acceso público de lectura para completar la entrega. No implementa mantenimiento de zonas.
   /api/v1/repartidores:
     get:
       tags:
@@ -1312,18 +1357,12 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Usuario"
-        "400":
-          $ref: "#/components/responses/Error400"
+                  $ref: "#/components/schemas/Repartidor"
         "401":
           $ref: "#/components/responses/Error401"
         "403":
           $ref: "#/components/responses/Error403"
-        "404":
-          $ref: "#/components/responses/Error404"
-        "409":
-          $ref: "#/components/responses/Error409"
-        "429":
-          $ref: "#/components/responses/Error429"
         "500":
           $ref: "#/components/responses/Error500"
+      description: Solo operadora o administración. Devuelve identificador, nombre y apellidos de las
+        cuentas activas con rol repartidor para el selector de asignación.
