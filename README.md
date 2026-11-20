@@ -21,10 +21,23 @@ La distribuidora recibe 80 a 120 pedidos diarios y necesita controlar catálogo,
 | Sesión tras recarga, cierre y vencimiento | Sí | Sí | Vitest; recarga/cierre en navegador |
 | Swagger/OpenAPI | Sí | Sí | 200 y registro/login desde Swagger |
 | API con systemd en EC2 | Sí | Sí | Servicio activo, catálogo/login/perfil correctos |
-| React compilado y proxy nginx | Sí | Sí | Acceso por túnel SSH, ver ejecución |
-| HTTPS público con dominio | Sí | No | Pendiente; demostración por SSH cifrado |
+| React compilado y proxy nginx | Sí | Sí | Acceso por IP:8080 comprobado; túnel opcional |
+| HTTPS público | Sí | No | Previsto para producción; el laboratorio se demuestra por IP HTTP con datos ficticios |
 
 No se implementan los módulos reservados al examen: reportes, mantenimiento de categorías, productos críticos, perfil editable, historial administrativo por usuario, comprobantes y mapa. Categorías y zonas tienen lectura para los formularios. Las vistas informativas de EP2 se conservan; Contacto continúa como simulación local, fuera de los tres bloques de API evaluados.
+
+### Estado por operación del avance de usuarios
+
+Se utilizan los estados pedidos por la solicitud: **Listo**, **En avance** y **Pendiente**. Esta tabla registra el estado actual; no modifica las fechas históricas del avance.
+
+| Operación | Estado | Evidencia |
+|---|---|---|
+| Tabla de usuarios | Listo | PostgreSQL 18/RDS, hash Argon2id y persistencia tras reinicio. |
+| Inicio de sesión | Listo | POST /api/v1/auth/login, hash comprobado y JWT con vigencia; probado en Swagger e integración. |
+| Registro (crear usuario) | Listo | POST /api/v1/auth/register; inserción con rol cliente asignado por el servidor y prueba 201/409. |
+| Modificar usuario | Listo | PATCH /api/v1/usuarios/{id}; administración, validación y revocación comprobadas. |
+| Listar usuarios | Listo | GET /api/v1/usuarios; autorización y lista comprobadas. |
+| Eliminar o desactivar usuario | Listo | DELETE /api/v1/usuarios/{id}; baja lógica persistente y rechazo de acceso comprobados. |
 
 ## 2. Decisiones técnicas
 
@@ -116,12 +129,13 @@ Ejemplo ficticio de login:
 { "correo": "persona@ejemplo.cl", "contrasena": "UnaClaveFicticia2026!" }
 ```
 
-Respuesta 200: accessToken generado, tokenType Bearer, expiresIn 900 y usuario público. Credenciales incorrectas: mismo 401 exista o no la cuenta. Nunca se devuelven contraseñas, hashes o clave de firma.
+Respuesta 200: accessToken generado, tokenType Bearer y expiresIn 900. React consulta después GET /auth/me con Bearer para obtener el usuario público y sus permisos vigentes. Credenciales incorrectas: mismo 401 exista o no la cuenta. Nunca se devuelven contraseñas, hashes o clave de firma.
 
 ### Swagger: direcciones reales
 
 - Desarrollo: [Swagger UI](http://localhost:3000/api/v1/docs/) y [OpenAPI JSON](http://localhost:3000/api/v1/openapi.json).
-- EC2 por túnel SSH: [Swagger UI](http://localhost:8080/api/v1/docs/) y [OpenAPI JSON](http://localhost:8080/api/v1/openapi.json). Son direcciones locales al equipo que abre el túnel; no una URL pública.
+- EC2 por IP: [Swagger UI](http://13.222.161.194:8080/api/v1/docs/) y [OpenAPI JSON](http://13.222.161.194:8080/api/v1/openapi.json).
+- EC2 por túnel SSH opcional: [Swagger UI](http://localhost:8080/api/v1/docs/) y [OpenAPI JSON](http://localhost:8080/api/v1/openapi.json). Son direcciones locales al equipo que abre el túnel; no una URL pública.
 - Ejecutar login, copiar accessToken en Authorize y probar según rol. Swagger no conserva autorización al cerrar. Los resultados comprobados figuran abajo.
 
 ## 6. Seguridad, sesión y roles
@@ -148,7 +162,7 @@ React usa **sessionStorage** para cumplir recarga en EP3. Al iniciar consulta /a
 
 Cambiar el ID no permite consultar cuentas/pedidos ajenos. React acompaña permisos con rutas/menús; el servidor vuelve a comprobarlos. CORS permite orígenes configurados, actualmente http://localhost:5173; nginx usa mismo origen. CORS no es autorización. Logs excluyen contraseñas/tokens y login limita intentos.
 
-RDS usa TLS verificado y la demostración remota usa SSH cifrado. HTTPS público con certificado/dominio está previsto y pendiente: no se transmiten tokens por un puerto HTTP público.
+RDS usa TLS verificado. La demostración solicitada por IP usa HTTP en 8080, limitado por el grupo de seguridad a la red autorizada y con cuentas ficticias de laboratorio. El HTTP remoto no cifra credenciales ni tokens y no es un despliegue de autenticación para producción. Para el acceso cifrado de demostración se conserva el túnel SSH opcional. HTTPS queda contemplado para producción, sin añadir certificados ni puertos nuevos a esta entrega.
 
 ## 7. Ejecutar y comprobar
 
@@ -162,19 +176,21 @@ RDS usa TLS verificado y la demostración remota usa SSH cifrado. HTTPS público
 
 Clave JWT: generar localmente con `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. Guardar solo en entorno privado; nunca VITE_.
 
-### EC2: demostración por túnel cifrado
+### EC2: demostración por IP y túnel opcional
 
-Instancia lab-springboot. IP comprobada el 20-nov-2026: **18.209.18.21**; cambia al reiniciar el laboratorio. La llave está fuera del repositorio.
+**Frontend por IP:** [Gas El Volcán](http://13.222.161.194:8080/). **Documentación viva:** [Swagger](http://13.222.161.194:8080/api/v1/docs/). Ambos accesos se probaron desde el navegador con la nueva IP. El grupo lab-springboot-sg permite 8080 desde la IP autorizada del equipo; al cambiar de red debe actualizarse «Mi IP». No se abrieron 80/443.
+
+Instancia lab-springboot. IP comprobada el 20-nov-2026: **13.222.161.194**; cambia al reiniciar el laboratorio. La llave está fuera del repositorio.
 
 ```bash
-ssh -i RUTA_A_LA_LLAVE -N -L 127.0.0.1:8080:127.0.0.1:8080 ubuntu@18.209.18.21
+ssh -i RUTA_A_LA_LLAVE -N -L 127.0.0.1:8080:127.0.0.1:8080 ubuntu@13.222.161.194
 ```
 
-Mantener terminal abierta y visitar **http://localhost:8080**. React, API y Swagger comparten origen. Nginx escucha en loopback:8080 y Node en loopback:3001. No requiere puertos públicos nuevos ni publicar RDS. SSH cifra el tramo entre equipos; HTTP queda en loopback.
+El siguiente túnel es una alternativa cifrada; mantener su terminal abierta y visitar **http://localhost:8080**. React, API y Swagger comparten origen. Nginx escucha en 127.0.0.1:8080 y en la interfaz EC2 172.31.23.154:8080; Node permanece en loopback:3001. No requiere puertos públicos nuevos ni publicar RDS. SSH cifra el tramo entre equipos; HTTP queda en loopback.
 
 Instalación activa: /home/ubuntu/BackendStackll-EP3-20261120; .env privado con permisos 600. Node 24.19.0 en /home/ubuntu/.local/node-v24.19.0-linux-x64/bin/node. Servicio gas-el-volcan-api.service con override ep3.conf. Se conserva /home/ubuntu/BackendStackll para reversión. React en /var/www/gas-volcan-ep3 y proxy nginx a 3001. Archivos de configuración en deploy/ de ambos repositorios. Antes de reemplazar una versión: instalar dependencias, migrar y probar en base _test; reiniciar solo después de aprobar.
 
-Comprobar desde EC2: `systemctl is-active gas-el-volcan-api`, `sudo nginx -t`, `curl http://127.0.0.1:8080/api/v1/productos`. AWS Academy, EC2, RDS y túnel deben estar activos para presentar.
+Comprobar desde EC2: `systemctl is-active gas-el-volcan-api`, `sudo nginx -t`, `curl http://127.0.0.1:8080/api/v1/productos`. AWS Academy, EC2 y RDS deben estar activos para presentar; el túnel solo es necesario si se elige el acceso localhost.
 
 ## 8. Pruebas reales
 
@@ -186,7 +202,7 @@ npm run lint
 npm audit --omit=dev
 ```
 
-**20-nov-2026:** 43 pruebas aprobadas en cuatro archivos, local PostgreSQL 18 y EC2/RDS. Lint: 0 errores/advertencias. Auditoría de ejecución: 0 vulnerabilidades detectadas en esa fecha.
+**20-nov-2026:** 44 pruebas aprobadas en cuatro archivos, local PostgreSQL 18 y EC2/RDS. Lint: 0 errores/advertencias. Auditoría de ejecución: 0 vulnerabilidades detectadas en esa fecha.
 
 | Caso | Esperado | Resultado |
 |---|---|---|
@@ -205,7 +221,7 @@ npm audit --omit=dev
 | Eliminar pendiente | 204 y stock devuelto | Conforme |
 | Servicio activo RDS | catálogo/OpenAPI 200, sin token 401, login/me 200 | Conforme |
 
-React: **27 pruebas, 12 archivos**, lint sin errores y compilación correcta. Cobertura global de instrucciones: **25,52 %**, no cobertura completa. Navegador: registro, recarga, confirmación, asignación, entrega/cobro, bloqueo por rol, alta/edición/baja de personal y CRUD de producto. Tras reiniciar el backend local, el pedido entregado permaneció. Catálogo a 360/768/1280 px sin desbordamiento de página. Manual e integración se entregan separados del código.
+React: **30 pruebas, 14 archivos**, lint sin errores y compilación correcta. Cobertura global de instrucciones: **33,08 %**, no cobertura completa. Navegador: registro, recarga, confirmación, asignación, entrega/cobro, bloqueo por rol, alta/edición/baja de personal y CRUD de producto. Tras reiniciar el backend local, el pedido entregado permaneció. Catálogo a 360/768/1280 px sin desbordamiento de página. Manual e integración se entregan separados del código.
 
 Pendientes: Drive con acceso docente verificado, HTTPS público, ensayo individual y carga en AVA. No se acreditan mediante estas pruebas.
 
@@ -239,3 +255,7 @@ Dificultades resueltas: IP EC2 cambiante, Node 24, DTO entre React/SQL, conflict
 - [AWS: TLS con RDS PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html).
 - [Swagger](https://swagger.io/docs/), [Axios](https://axios-http.com/docs/intro), [jose](https://github.com/panva/jose), [node-argon2](https://github.com/ranisalt/node-argon2).
 - DSY1104: Guías 19/20, solicitud avance/EP3, caso Forma C y ERS V2/V3. El texto recibido de la Guía 19 conserva un pie con número 18; se sigue la numeración indicada en el curso.
+
+Validación final del incremento: se corrigió el detalle privado retenido tras perder sesión, el error de alta oculto detrás del modal y la carga de recursos de Swagger por IP HTTP. Las regresiones se observaron fallar antes y aprobar después. OpenAPI declara respuestas y límites específicos por operación. El frontend final pasó 30 pruebas con cobertura real de 33,08 % de instrucciones; no se alteraron exclusiones.
+
+Comprobación adicional del estado Listo: Postman Runtime/Newman ejecutó login, listado, alta, modificación, consulta, desactivación y lectura de la baja persistida en EC2/RDS: 7 solicitudes, 7 comprobaciones y 0 fallos. Se usó personal ficticio y las credenciales/tokens no se imprimieron.
