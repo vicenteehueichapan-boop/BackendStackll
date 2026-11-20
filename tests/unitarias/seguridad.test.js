@@ -1,9 +1,10 @@
+import { entorno } from '../../src/config/entorno.js';
 import { SignJWT } from 'jose';
 import { describe, expect, it } from 'vitest';
 import { hashearContrasena, verificarContrasena } from '../../src/security/contrasenas.js';
 import { emitirToken, verificarToken } from '../../src/security/tokens.js';
 
-const clave = Buffer.from(process.env.JWT_SECRETO, 'base64');
+const clave = Buffer.from(entorno.JWT_SECRETO, 'base64');
 const usuario = { id: '019a6f2c-1d2e-7c3b-9a10-5b6c7d8e9f00', versionSesion: 0 };
 
 describe('contraseñas con Argon2id', () => {
@@ -25,8 +26,8 @@ describe('contraseñas con Argon2id', () => {
 describe('JWT', () => {
   it('emite sub, iss, aud, iat, exp, jti y ver, sin rol ni datos sensibles', async () => {
     const afirmaciones = await verificarToken(await emitirToken(usuario));
-    expect(afirmaciones).toMatchObject({ sub: usuario.id, iss: process.env.JWT_EMISOR, aud: process.env.JWT_AUDIENCIA, ver: 0 });
-    expect(afirmaciones.exp - afirmaciones.iat).toBe(Number(process.env.JWT_DURACION_SEGUNDOS));
+    expect(afirmaciones).toMatchObject({ sub: usuario.id, iss: entorno.JWT_EMISOR, aud: entorno.JWT_AUDIENCIA, ver: 0 });
+    expect(afirmaciones.exp - afirmaciones.iat).toBe(Number(entorno.JWT_DURACION_SEGUNDOS));
     expect(afirmaciones).not.toHaveProperty('rol');
   });
 
@@ -38,14 +39,14 @@ describe('JWT', () => {
 
   it('rechaza un token vencido', async () => {
     const vencido = await new SignJWT({ ver: 0 }).setProtectedHeader({ alg: 'HS256' }).setSubject(usuario.id)
-      .setIssuer(process.env.JWT_EMISOR).setAudience(process.env.JWT_AUDIENCIA).setJti('x')
+      .setIssuer(entorno.JWT_EMISOR).setAudience(entorno.JWT_AUDIENCIA).setJti('x')
       .setIssuedAt(Math.floor(Date.now() / 1000) - 1000).setExpirationTime(Math.floor(Date.now() / 1000) - 10).sign(clave);
     await expect(verificarToken(vencido)).rejects.toThrow(/exp/);
   });
 
   it('rechaza otro destinatario y el algoritmo «none»', async () => {
     const otroDestino = await new SignJWT({ ver: 0 }).setProtectedHeader({ alg: 'HS256' }).setSubject(usuario.id)
-      .setIssuer(process.env.JWT_EMISOR).setAudience('otra-app').setJti('x').setIssuedAt().setExpirationTime('5m').sign(clave);
+      .setIssuer(entorno.JWT_EMISOR).setAudience('otra-app').setJti('x').setIssuedAt().setExpirationTime('5m').sign(clave);
     await expect(verificarToken(otroDestino)).rejects.toThrow(/aud/);
 
     const cuerpo = Buffer.from(JSON.stringify({ sub: usuario.id, ver: 0 })).toString('base64url');

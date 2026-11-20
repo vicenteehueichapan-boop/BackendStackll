@@ -8,10 +8,15 @@ import { manejadorErrores, rutaNoEncontrada } from './errores/manejadorErrores.j
 import { authRoutes } from './routes/auth.routes.js';
 import { documentacionRoutes } from './routes/documentacion.routes.js';
 import { productosRoutes } from './routes/productos.routes.js';
+import { usuariosRoutes } from './routes/usuarios.routes.js';
+import { pedidosRoutes } from './routes/pedidos.routes.js';
+import { referenciasRoutes } from './routes/referencias.routes.js';
 
 export function crearApp() {
   const app = express();
   app.disable('x-powered-by');
+  // Solo el proxy local puede comunicar la IP real; no se confía en proxies de Internet.
+  app.set('trust proxy', 'loopback');
 
   app.use(helmet());
   // CORS: solo los orígenes del frontend definidos en .env. No reemplaza a la autorización.
@@ -23,9 +28,12 @@ export function crearApp() {
   app.use(express.json({ limit: '20kb' }));
   app.use(pinoHttp({ logger: registro }));
 
-  app.use('/api', documentacionRoutes);
-  app.use('/api/auth', authRoutes);
-  app.use('/api/productos', productosRoutes);
+  app.use('/api/v1', documentacionRoutes);
+  app.use('/api/v1/auth', authRoutes);
+  app.use('/api/v1/productos', productosRoutes);
+  app.use('/api/v1/usuarios', usuariosRoutes);
+  app.use('/api/v1/pedidos', pedidosRoutes);
+  app.use('/api/v1', referenciasRoutes);
 
   app.use(rutaNoEncontrada);
   app.use(manejadorErrores);

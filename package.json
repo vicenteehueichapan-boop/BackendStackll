@@ -1,11 +1,11 @@
 {
   "name": "gas-el-volcan-api",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "API REST de la Distribuidora de Gas El Volcán: catálogo, pedidos e inicio de sesión con JWT",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "start": "node --env-file=.env src/server.js",
