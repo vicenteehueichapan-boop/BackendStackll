@@ -10,8 +10,9 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/BackendStackll
-ExecStart=/usr/bin/node --env-file=/home/ubuntu/BackendStackll/.env src/server.js
+WorkingDirectory=/home/ubuntu/BackendStackll-EP3-20261120
+ExecStart=/home/ubuntu/.local/node-v24.19.0-linux-x64/bin/node --env-file=/home/ubuntu/BackendStackll-EP3-20261120/.env src/server.js
+Environment=DIRECCION_ESCUCHA=127.0.0.1
 Restart=on-failure
 RestartSec=5
 # El proceso no puede ganar privilegios ni ver el /tmp de otros servicios.

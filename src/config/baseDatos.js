@@ -13,7 +13,7 @@ export const pool = new pg.Pool({
   user: entorno.DB_USER,
   password: entorno.DB_PASSWORD,
   // TLS verificado con el certificado de AWS: el tráfico hacia RDS va cifrado.
-  ssl: { ca: fs.readFileSync(entorno.DB_CA_PATH, 'utf8') },
+  ssl: entorno.DB_TLS === 'local' ? false : { ca: fs.readFileSync(entorno.DB_CA_PATH, 'utf8') },
   max: 10,
   connectionTimeoutMillis: 5000,
   idleTimeoutMillis: 30000,

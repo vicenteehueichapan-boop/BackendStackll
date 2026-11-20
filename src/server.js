@@ -3,7 +3,7 @@ import { pool } from './config/baseDatos.js';
 import { entorno } from './config/entorno.js';
 import { registro } from './config/registro.js';
 
-const servidor = crearApp().listen(entorno.PUERTO, '0.0.0.0', () => {
+const servidor = crearApp().listen(entorno.PUERTO, entorno.DIRECCION_ESCUCHA, () => {
   registro.info(`API Gas El Volcán escuchando en el puerto ${entorno.PUERTO}`);
 });
 

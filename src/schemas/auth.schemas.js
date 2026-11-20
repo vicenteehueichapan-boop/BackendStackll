@@ -10,7 +10,7 @@ export const esquemaRegistro = z.object({
   apellidos: z.string().trim().min(2, 'Ingresa tus apellidos.').max(80),
   run: z.string().trim().toUpperCase().regex(/^[0-9]{7,8}[0-9K]$/, 'Ingresa el RUN sin puntos ni guion.'),
   correo,
-  // NIST SP 800-63B: mínimo 8 caracteres; máximo 128 para acotar el costo del hash.
+  // Regla del proyecto: 8 a 128 caracteres; el máximo acota el costo del hash.
   contrasena: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres.').max(128),
   tipoCliente: z.enum(['residencial', 'comercial'], 'El tipo de cliente no es válido.'),
   direccion: z.string().trim().max(200).default(''),
