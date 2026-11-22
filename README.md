@@ -64,6 +64,8 @@ Roles: **cliente**, **operadora**, **repartidor** y **administración**. Quedan 
 
 ![Diagrama entidad-relación](docs/diagramas/entidad-relacion-ep3.png)
 
+**Diagramas** (públicos en este repositorio, sin iniciar sesión): [entidad-relación](https://github.com/vicenteehueichapan-boop/BackendStackll/blob/main/docs/diagramas/entidad-relacion-ep3.png) · [React, API y base de datos](https://github.com/vicenteehueichapan-boop/BackendStackll/blob/main/docs/diagramas/arquitectura-ep3.png) · [secuencia de login y JWT](https://github.com/vicenteehueichapan-boop/BackendStackll/blob/main/docs/diagramas/secuencia-jwt-ep3.png).
+
 La migración [`migrations/1731340800000_esquema-inicial.sql`](migrations/1731340800000_esquema-inicial.sql) es la referencia ejecutable del modelo.
 
 - **usuario** guarda correo único, hash de contraseña, rol, estado y versión de sesión. **perfil_cliente** (1 a 0..1) agrega RUN único, tipo de cliente y zona.
@@ -220,7 +222,7 @@ Resultado: **44 pruebas aprobadas** en cuatro archivos, contra PostgreSQL local 
 | Eliminar producto con pedidos o pedido en curso | 409 | Conforme |
 | Eliminar pedido pendiente | 204 y stock devuelto | Conforme |
 
-**Pendiente:** HTTPS público y enlace de Drive con acceso de lectura para el docente.
+**Pendiente:** HTTPS público (previsto para producción).
 
 ## 10. Checklist Guía 19
 
@@ -229,7 +231,7 @@ Resultado: **44 pruebas aprobadas** en cuatro archivos, contra PostgreSQL local 
 - [x] Enlaces cruzados entre los README del backend y del frontend.
 - [x] Tecnología y ejecución en EC2 justificadas.
 - [x] Base de datos y diagrama entidad-relación actualizados, sin diccionario de datos.
-- [ ] Diagramas en Drive con enlace directo y acceso de lectura para el docente.
+- [x] Diagramas con enlace directo y acceso de lectura público, versionados en [`docs/diagramas/`](docs/diagramas/).
 - [x] Responsabilidades del backend y del integrante.
 - [x] Estructura, conexión a datos y endpoints con estado real.
 - [x] OpenAPI/Swagger con instrucciones para consultar y probar.
