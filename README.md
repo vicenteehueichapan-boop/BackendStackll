@@ -1,200 +1,200 @@
 # Backend · Distribuidora de Gas El Volcán
 
-DSY1104 Desarrollo Fullstack II · Duoc UC · sección 006D · 2026. Caso Forma C. Vicente Hueichapan Poblete, trabajo individual.
+API REST del sistema de pedidos de gas licuado de la Distribuidora de Gas El Volcán (caso Forma C).
 
-Continuidad del frontend de la unidad 2. Este README actualiza el plan de la **Guía 19** y la solicitud de avance/EP3 al **20 de noviembre de 2026**. El avance original permanece en el historial.
-
-**Frontend:** [ProtecoFullstackllVolcan](https://github.com/vicenteehueichapan-boop/ProtecoFullstackllVolcan).
-
-## 1. Alcance y estado real
-
-La distribuidora recibe 80 a 120 pedidos diarios y necesita controlar catálogo, existencias, asignación y entrega. Flujo: cliente registrado confirma → operadora asigna → repartidor inicia recorrido y entrega → se registra cobro en efectivo. Administración mantiene productos y cuentas.
-
-| Área | Diseñado | Implementado | Comprobación real |
-|---|---|---|---|
-| PostgreSQL 18, migración y semillas | Sí | Sí | Local y EC2/RDS |
-| Registro, login, perfil y logout | Sí | Sí | Integración y navegador |
-| CRUD usuarios, roles y baja lógica | Sí | Sí | Integración y administración React |
-| CRUD catálogo | Sí | Sí | Integración y navegador |
-| CRUD pedidos, asignación y estados | Sí | Sí | Integración y recorrido de los cuatro roles |
-| Precio, stock y transacción | Sí | Sí | Conflictos 409 y concurrencia sobre stock |
-| Sesión tras recarga, cierre y vencimiento | Sí | Sí | Vitest; recarga/cierre en navegador |
-| Swagger/OpenAPI | Sí | Sí | 200 y registro/login desde Swagger |
-| API con systemd en EC2 | Sí | Sí | Servicio activo, catálogo/login/perfil correctos |
-| React compilado y proxy nginx | Sí | Sí | Acceso por IP:8080 comprobado; túnel opcional |
-| HTTPS público | Sí | No | Previsto para producción; el laboratorio se demuestra por IP HTTP con datos ficticios |
-
-No se implementan los módulos reservados al examen: reportes, mantenimiento de categorías, productos críticos, perfil editable, historial administrativo por usuario, comprobantes y mapa. Categorías y zonas tienen lectura para los formularios. Las vistas informativas de EP2 se conservan; Contacto continúa como simulación local, fuera de los tres bloques de API evaluados.
-
-### Estado por operación del avance de usuarios
-
-Se utilizan los estados pedidos por la solicitud: **Listo**, **En avance** y **Pendiente**. Esta tabla registra el estado actual; no modifica las fechas históricas del avance.
-
-| Operación | Estado | Evidencia |
-|---|---|---|
-| Tabla de usuarios | Listo | PostgreSQL 18/RDS, hash Argon2id y persistencia tras reinicio. |
-| Inicio de sesión | Listo | POST /api/v1/auth/login, hash comprobado y JWT con vigencia; probado en Swagger e integración. |
-| Registro (crear usuario) | Listo | POST /api/v1/auth/register; inserción con rol cliente asignado por el servidor y prueba 201/409. |
-| Modificar usuario | Listo | PATCH /api/v1/usuarios/{id}; administración, validación y revocación comprobadas. |
-| Listar usuarios | Listo | GET /api/v1/usuarios; autorización y lista comprobadas. |
-| Eliminar o desactivar usuario | Listo | DELETE /api/v1/usuarios/{id}; baja lógica persistente y rechazo de acceso comprobados. |
-
-## 2. Decisiones técnicas
-
-| Componente | Elección y motivo |
+| | |
 |---|---|
-| Lenguaje/framework | Node.js 24 y Express 5: JavaScript común con React y separación explícita de responsabilidades. Versiones exactas en el lockfile. |
-| Infraestructura | EC2 Ubuntu, instancia lab-springboot; systemd inicia y reinicia el proceso. EC2 es infraestructura, Express es framework. |
-| Datos | PostgreSQL 18 en RDS: relaciones, integridad y transacciones para pedidos/stock. Se requiere versión 18 por uuidv7(). |
-| Acceso a datos | pg, SQL parametrizado y migraciones SQL transaccionales versionadas; sin persistencia de negocio en memoria. |
-| DTO y validación | Zod valida parámetros y cuerpos estrictos. Los DTO de salida excluyen hashes y campos internos. |
-| Seguridad | argon2, jose, Helmet, CORS, límites de login y Pino con ocultamiento de datos sensibles. |
-| Contratos | OpenAPI 3.1 y Swagger UI; especificación versionada junto al código. |
-| Pruebas/calidad | Vitest, Supertest, PostgreSQL de pruebas, oxlint y auditoría de dependencias. |
+| Asignatura | DSY1104 Desarrollo Fullstack II · Duoc UC · Sección 006D · 2026 |
+| Integrante | Vicente Hueichapan Poblete |
+| Frontend | [ProtecoFullstackllVolcan](https://github.com/vicenteehueichapan-boop/ProtecoFullstackllVolcan) |
+| Aplicación desplegada | http://3.208.18.46:8080/ |
+| Swagger (documentación viva) | http://3.208.18.46:8080/api/v1/docs/ |
 
-Se evaluó Lambda con API Gateway: exige organizar funciones, entrada HTTP y acceso a RDS; los datos seguirían persistiendo fuera de la función. Se elige EC2 para continuar el laboratorio y mantener un proceso sencillo para el volumen del caso. RDS usa TLS con CA verificada. Credenciales y llave SSH permanecen fuera de Git y React.
+## 1. Alcance
 
-## 3. Modelo de datos
+La distribuidora recibe entre 80 y 120 pedidos diarios por teléfono. El backend reemplaza el registro en cuadernos y los datos simulados del frontend de EP2 por una base de datos relacional con tres bloques:
 
-![Entidad-relación con PK, FK y cardinalidades](docs/diagramas/entidad-relacion-ep3.png)
+1. **Usuarios, autenticación y roles:** registro, inicio de sesión con JWT, CRUD de usuarios y permisos por rol.
+2. **Catálogo:** CRUD de cilindros y accesorios con tarifas residencial y comercial.
+3. **Pedido de gas:** crear, listar, ver el detalle, asignar repartidor y cambiar el estado. Regla de conflicto: un pedido no pasa a «en camino» sin repartidor asignado (409).
 
-La migración en migrations/ es la referencia ejecutable. Se incluyen atributos principales y restricciones, sin diccionario de datos.
+Roles: **cliente**, **operadora**, **repartidor** y **administración**. Quedan para el examen final los reportes, el mantenimiento de categorías, los productos críticos, el perfil editable, el historial por usuario, los comprobantes y el mapa.
 
-- usuario: correo único, hash, rol, estado y versión de sesión. perfil_cliente: relación 1 a 0..1, RUN único, tarifa y zona opcional.
-- Una categoría tiene muchos productos. Una zona tiene muchos perfiles/pedidos. Un pedido contiene muchas líneas, cada una referencia un producto; la PK compuesta impide repetirlo.
-- Un cliente tiene muchos pedidos; un repartidor tiene muchas asignaciones. La API obtiene el propietario desde el JWT, nunca desde un clienteId enviado.
-- Precios y total son enteros positivos en CLP; cantidades positivas y stock no negativo. Correo normalizado a minúsculas y código de producto único e inmutable.
-- FK RESTRICT conserva usuarios/productos referenciados. Usuario se deshabilita; borrar producto usado devuelve 409. Eliminar pendiente borra sus líneas por CASCADE y devuelve stock en la misma transacción.
-- Desde asignado se requiere repartidor y nombre de asignación. El cobro existe exactamente al estar entregado.
-- El esquema inicial conserva mensaje_contacto y usuario_id nullable para pedidos históricos. EP3 no expone mensajes ni permite nuevos pedidos anónimos: exige sesión cliente. Esta adaptación a los roles de la evaluación se explicita en la ERS V3.
+## 2. Estado del trabajo
 
-Las semillas trasladan las 14 referencias del catálogo React, categorías y zonas. Son repetibles y no sobrescriben cambios. La contraseña de cinco perfiles ficticios del personal se configura por entorno y se hashea antes de insertarse. Usuarios, hashes, versiones de sesión, catálogo, pedidos, líneas y cobros sobreviven al reinicio. Solo el carrito permanece en el navegador.
+| Área | Diseñado | Implementado | Probado |
+|---|---|---|---|
+| PostgreSQL, migración y semillas | Sí | Sí | Local y EC2/RDS |
+| Registro, login, perfil y logout | Sí | Sí | Pruebas de integración, Swagger y navegador |
+| CRUD de usuarios, roles y baja lógica | Sí | Sí | Pruebas de integración, Postman y navegador |
+| CRUD de catálogo | Sí | Sí | Pruebas de integración y navegador |
+| Pedidos: creación, asignación, estados y eliminación | Sí | Sí | Pruebas de integración y recorrido de los cuatro roles |
+| Precio, stock y transacciones | Sí | Sí | Conflictos 409 y concurrencia de stock |
+| Swagger / OpenAPI | Sí | Sí | Registro y login desde Swagger |
+| Despliegue en EC2 con RDS | Sí | Sí | Servicio activo y acceso por IP |
+| HTTPS público | Sí | No | Previsto para producción |
 
-**Drive:** los permisos de lectura del docente quedan sin verificar. Los tres diagramas están versionados como imágenes y se entregan también en PDF separado. No se acredita un enlace de Drive accesible.
+### Avance de la tabla de usuarios
 
-## 4. Organización y responsabilidades
+| Operación | Estado | Endpoint |
+|---|---|---|
+| Tabla de usuarios | Listo | PostgreSQL con hash Argon2id; persiste tras reiniciar |
+| Inicio de sesión | Listo | `POST /api/v1/auth/login` |
+| Registro (crear usuario) | Listo | `POST /api/v1/auth/register` |
+| Modificar usuario | Listo | `PATCH /api/v1/usuarios/{id}` |
+| Listar usuarios | Listo | `GET /api/v1/usuarios` |
+| Eliminar o desactivar usuario | Listo | `DELETE /api/v1/usuarios/{id}` (baja lógica) |
 
-![React, API y base de datos](docs/diagramas/arquitectura-ep3.png)
+## 3. Decisiones técnicas
+
+| Componente | Elección | Motivo |
+|---|---|---|
+| Lenguaje y framework | Node.js 24 y Express 5 | Mismo lenguaje que React y separación clara de rutas, servicios y datos. |
+| Ejecución | EC2 (Ubuntu) con systemd y nginx | Proceso permanente que se reinicia ante fallos; nginx sirve React y la API en el mismo origen. Se evaluó Lambda con API Gateway, pero un solo proceso es más simple para el volumen del caso. |
+| Base de datos | PostgreSQL 18 en Amazon RDS | Relaciones, restricciones y transacciones para pedidos y stock. Acceso privado desde EC2 con TLS verificado. |
+| Acceso a datos | `pg` con SQL parametrizado y migraciones SQL versionadas | Control explícito de las consultas y protección contra inyección SQL. |
+| Validación y DTO | Zod | Esquemas estrictos de entrada; los DTO de salida excluyen hashes y campos internos. |
+| Contraseñas | `argon2` (Argon2id) | Algoritmo recomendado por OWASP para contraseñas. |
+| JWT | `jose` (HS256) | Firma y verificación con validación de algoritmo, emisor, destinatario y vencimiento. |
+| Protección HTTP | Helmet, CORS, express-rate-limit, Pino | Cabeceras seguras, orígenes permitidos, límite de intentos de login y registros sin datos sensibles. |
+| Documentación | OpenAPI 3.1 y swagger-ui-express | Contrato versionado junto al código. |
+| Pruebas | Vitest, Supertest y oxlint | Pruebas sobre una base PostgreSQL de pruebas separada. |
+
+## 4. Diseño de datos
+
+![Diagrama entidad-relación](docs/diagramas/entidad-relacion-ep3.png)
+
+La migración [`migrations/1731340800000_esquema-inicial.sql`](migrations/1731340800000_esquema-inicial.sql) es la referencia ejecutable del modelo.
+
+- **usuario** guarda correo único, hash de contraseña, rol, estado y versión de sesión. **perfil_cliente** (1 a 0..1) agrega RUN único, tipo de cliente y zona.
+- Una **categoría** tiene muchos **productos**; una **zona_despacho** tiene muchos perfiles y pedidos.
+- Un cliente tiene muchos **pedidos**; un repartidor tiene muchas asignaciones. Un pedido tiene muchas **líneas**; la clave compuesta impide repetir un producto en el mismo pedido.
+- Precios y total son enteros positivos en CLP; cantidades positivas; stock no negativo. El código de producto es único e inmutable.
+- Desde «asignado» el pedido exige repartidor, y el cobro existe solo cuando está «entregado» (restricciones CHECK).
+- Las claves foráneas usan RESTRICT: un usuario se desactiva en vez de borrarse y un producto con pedidos no se elimina (409). Eliminar un pedido pendiente borra sus líneas y devuelve el stock en la misma transacción.
+- El propietario de un pedido se obtiene del JWT, nunca de un identificador enviado por el cliente.
+
+**Datos iniciales.** Las semillas cargan los 14 productos, las categorías y las 5 zonas del frontend de EP2, y cinco cuentas ficticias del personal cuya contraseña se toma de una variable de entorno y se guarda como hash. Son repetibles y no sobrescriben cambios. Todo persiste al reiniciar el backend; solo el carrito vive en el navegador.
+
+## 5. Organización y responsabilidades
+
+![Esquema React, API y base de datos](docs/diagramas/arquitectura-ep3.png)
 
 | Carpeta | Responsabilidad |
 |---|---|
-| routes/ y controllers/ | Método/ruta, validación de parámetros/cuerpo y estado HTTP. |
-| schemas/ | Campos permitidos, formato, longitudes y rangos. |
-| services/ | Reglas del negocio, propiedad y coordinación transaccional. |
-| repositories/ | SQL parametrizado sobre pool o cliente transaccional. |
-| security/ | Hash, JWT, autenticación y autorización. |
-| config/ | Entorno validado, TLS, pool, migraciones y logs. |
-| migrations/ y seeds/ | Estructura persistente y datos ficticios iniciales. |
+| `src/routes/` y `src/controllers/` | Método y ruta HTTP, lectura de parámetros y estado de la respuesta. |
+| `src/schemas/` | Validación de la entrada y forma de la salida (DTO). |
+| `src/services/` | Reglas del negocio, propiedad de los registros y transacciones. |
+| `src/repositories/` | Consultas SQL parametrizadas. |
+| `src/security/` | Hash de contraseñas, emisión y verificación del JWT, autenticación y autorización. |
+| `src/config/` | Variables de entorno validadas, conexión TLS, migraciones y registros. |
+| `migrations/` y `seeds/` | Estructura de la base y datos ficticios iniciales. |
 
-Vicente Hueichapan asume análisis, modelado, código de ambas aplicaciones, pruebas y documentación. No se atribuyen tareas a integrantes inexistentes.
+Vicente Hueichapan Poblete desarrolló el análisis, el modelo de datos, el backend, la integración con React, las pruebas y la documentación.
 
-**Recorrido completo: confirmar pedido.** ConfirmarPedido valida entrega y llama a pedidosApi; su DTO envía contacto, dirección, zona y líneas con código, cantidad y precio mostrado. Zod valida estructura y autenticación identifica al cliente. El servicio lee su tarifa de la base, bloquea productos en orden estable con FOR UPDATE y comprueba disponibilidad, precio vigente y stock. Calcula precios/total, inserta pedido/líneas y descuenta stock en una transacción. Devuelve 201; React limpia carrito y muestra confirmación. Si cambió precio o stock devuelve 409 y revierte todo. El navegador no decide rol, propietario ni precio final.
+**Recorrido de una operación: confirmar pedido.** React envía `POST /api/v1/pedidos` con líneas, dirección y zona. Zod valida el cuerpo, `autenticar` identifica al cliente y `autorizar` exige el rol cliente. El servicio lee la tarifa del perfil, bloquea los productos con `FOR UPDATE`, comprueba precio y stock, calcula el total y guarda el pedido, sus líneas y el descuento de stock en una transacción. Responde 201; si el precio o el stock cambiaron responde 409 y no guarda nada. El navegador nunca decide el precio final, el rol ni el propietario.
 
-## 5. API y pantallas
+## 6. API y documentación viva
 
-Base **/api/v1**. [OpenAPI](docs/openapi.yaml) contiene por operación parámetros, JSON ficticios de entrada/salida, validaciones, respuestas, errores y permisos. Las operaciones documentadas están implementadas; no se presentan rutas propuestas como disponibles.
+Base `/api/v1`. El contrato completo (parámetros, ejemplos ficticios, respuestas, errores y permisos) está en [`docs/openapi.yaml`](docs/openapi.yaml) y se publica con Swagger UI.
 
-| Método y ruta relativa | Permiso / pantalla | Entidades / éxito |
-|---|---|---|
-| POST /auth/register | Público; Registro. Asigna cliente, rechaza rol enviado | usuario, perfil_cliente / 201 |
-| POST /auth/login | Público; Ingreso y Acceso personal | usuario / 200 Bearer con vigencia |
-| GET /auth/me | Sesión válida; restaurar al recargar | usuario, perfil_cliente / 200 |
-| POST /auth/logout | Sesión válida; Cerrar sesión | version_sesion / 204 |
-| GET /usuarios | Administración; tabla de cuentas | usuario / 200 |
-| POST /usuarios | Administración; crear personal | usuario / 201 |
-| GET /usuarios/{id} | Propietario o administración | usuario / 200 |
-| PATCH /usuarios/{id} | Administración; editar datos, rol/estado | usuario / 200 |
-| DELETE /usuarios/{id} | Administración; deshabilitar | usuario / 204 |
-| GET /productos | Público; catálogo, carrito y destacados. Filtros busqueda/categoria | producto, categoria / 200 |
-| GET /productos/{codigo} | Público; detalle | producto, categoria / 200 |
-| POST /productos | Administración; crear | producto / 201 |
-| PUT /productos/{codigo} | Administración; reemplazar campos, código estable | producto / 200 |
-| DELETE /productos/{codigo} | Administración; eliminar sin referencias | producto / 204 |
-| GET /pedidos | Cliente propios, repartidor asignados, operadora/admin todos | pedido, linea_pedido, zona / 200 |
-| POST /pedidos | Cliente; Confirmar pedido | pedido, lineas, producto / 201 |
-| GET /pedidos/{id} | Propietario/asignado u operadora/admin; detalle | pedido, lineas / 200 |
-| PATCH /pedidos/{id}/asignacion | Operadora/admin; selector | pedido, usuario repartidor / 200 |
-| PATCH /pedidos/{id}/estado | Repartidor asignado u operadora/admin | pedido / 200 |
-| DELETE /pedidos/{id} | Cliente dueño u operadora/admin; solo pendiente | pedido, lineas, producto / 204 |
-| GET /categorias y /zonas | Público; filtros/formulario | categoria, zona_despacho / 200 |
-| GET /repartidores | Operadora/admin; asignación | usuario repartidor activo / 200 |
+- **Swagger en EC2:** http://3.208.18.46:8080/api/v1/docs/ · OpenAPI JSON: http://3.208.18.46:8080/api/v1/openapi.json
+- **Swagger local:** http://localhost:3000/api/v1/docs/
+- Para probar una ruta protegida: ejecutar `POST /auth/login`, copiar `accessToken`, presionar **Authorize** y pegarlo.
 
-id debe ser UUID; codigo tiene dos letras mayúsculas y tres números. Entrada inválida: 400; token ausente, alterado, vencido o revocado: 401; rol/propiedad insuficiente: 403; inexistente: 404; duplicados/conflictos del caso: 409; límite de login: 429. Error JSON: error.codigo, error.mensaje y error.detalles por campo cuando corresponde. Sin registros se devuelve lista vacía.
+| Método y ruta | Permiso | Pantalla del frontend | Éxito |
+|---|---|---|---|
+| `POST /auth/register` | Público (rol cliente asignado por el servidor) | Registro | 201 |
+| `POST /auth/login` | Público | Ingresar y Acceso del personal | 200 |
+| `GET /auth/me` | Sesión válida | Restaurar sesión al recargar | 200 |
+| `POST /auth/logout` | Sesión válida | Cerrar sesión | 204 |
+| `GET /usuarios` | Administración | Administración › Usuarios | 200 |
+| `POST /usuarios` | Administración | Crear cuenta del personal | 201 |
+| `GET /usuarios/{id}` | Dueño de la cuenta o administración | Detalle de cuenta | 200 |
+| `PATCH /usuarios/{id}` | Administración | Editar datos, rol y estado | 200 |
+| `DELETE /usuarios/{id}` | Administración | Desactivar cuenta | 204 |
+| `GET /productos` y `GET /productos/{codigo}` | Público | Catálogo y detalle | 200 |
+| `POST /productos` | Administración | Administración › Productos | 201 |
+| `PUT /productos/{codigo}` | Administración | Editar producto | 200 |
+| `DELETE /productos/{codigo}` | Administración | Eliminar producto sin pedidos | 204 |
+| `GET /pedidos` | Cliente: propios · Repartidor: asignados · Operadora y administración: todos | Mis pedidos, Pedidos del día, Mis entregas | 200 |
+| `POST /pedidos` | Cliente | Confirmar pedido | 201 |
+| `GET /pedidos/{id}` | Dueño, repartidor asignado, operadora o administración | Seguimiento | 200 |
+| `PATCH /pedidos/{id}/asignacion` | Operadora o administración | Asignar repartidor | 200 |
+| `PATCH /pedidos/{id}/estado` | Repartidor asignado, operadora o administración | Marcar en camino y entregado | 200 |
+| `DELETE /pedidos/{id}` | Cliente dueño, operadora o administración (solo pendiente) | Eliminar pedido | 204 |
+| `GET /categorias`, `GET /zonas` | Público | Filtros y formulario de entrega | 200 |
+| `GET /repartidores` | Operadora o administración | Selector de repartidor | 200 |
 
-DELETE usuario es baja lógica para conservar relaciones. La actualización de pedido se expresa por asignación/estado; no reescribe cobro ni precio histórico. Último administrador, conversión cliente-personal o repartidor con entregas pendientes: 409. Crear cliente corresponde al registro público; crear personal exige administración.
+**Errores:** 400 entrada inválida · 401 token ausente, alterado, vencido o revocado · 403 rol o propiedad insuficiente · 404 inexistente · 409 conflicto del negocio · 429 demasiados intentos de login. Formato: `{"error": {"codigo", "mensaje", "detalles"}}`.
 
 Ejemplo ficticio de login:
 
 ```json
+POST /api/v1/auth/login
 { "correo": "persona@ejemplo.cl", "contrasena": "UnaClaveFicticia2026!" }
+
+200
+{ "accessToken": "eyJ...", "tokenType": "Bearer", "expiresIn": 900 }
 ```
 
-Respuesta 200: accessToken generado, tokenType Bearer y expiresIn 900. React consulta después GET /auth/me con Bearer para obtener el usuario público y sus permisos vigentes. Credenciales incorrectas: mismo 401 exista o no la cuenta. Nunca se devuelven contraseñas, hashes o clave de firma.
+Con credenciales incorrectas la respuesta es el mismo 401, exista o no la cuenta. Nunca se devuelven contraseñas, hashes ni la clave de firma.
 
-### Swagger: direcciones reales
+## 7. Seguridad
 
-- Desarrollo: [Swagger UI](http://localhost:3000/api/v1/docs/) y [OpenAPI JSON](http://localhost:3000/api/v1/openapi.json).
-- EC2 por IP: [Swagger UI](http://13.222.161.194:8080/api/v1/docs/) y [OpenAPI JSON](http://13.222.161.194:8080/api/v1/openapi.json).
-- EC2 por túnel SSH opcional: [Swagger UI](http://localhost:8080/api/v1/docs/) y [OpenAPI JSON](http://localhost:8080/api/v1/openapi.json). Son direcciones locales al equipo que abre el túnel; no una URL pública.
-- Ejecutar login, copiar accessToken en Authorize y probar según rol. Swagger no conserva autorización al cerrar. Los resultados comprobados figuran abajo.
-
-## 6. Seguridad, sesión y roles
-
-**Argon2id**, biblioteca argon2: memoria 19 MiB, dos iteraciones y paralelismo 1; sal aleatoria por hash. Diseñado para contraseñas y con costo de memoria, siguiendo la alternativa mínima de OWASP citada al final. Regla de entrada del proyecto: 8 a 128 caracteres. No se guarda ni registra texto plano.
+**Contraseñas.** Argon2id con 19 MiB de memoria, 2 iteraciones y paralelismo 1, con sal aleatoria por hash (configuración mínima recomendada por OWASP). Es un algoritmo lento y con costo de memoria, a diferencia de MD5 o SHA, lo que encarece los ataques por fuerza bruta. Las contraseñas se aceptan entre 8 y 128 caracteres y nunca se guardan ni registran en texto plano.
 
 ![Secuencia de login y solicitud protegida, con rechazos](docs/diagramas/secuencia-jwt-ep3.png)
 
-La API emite y verifica JWT **HS256** con jose y clave aleatoria de al menos 32 bytes fuera de Git. Valida firma, algoritmo, expiración, emisor y destinatario. Claims: sub, iss, aud, iat, exp, jti y ver (revocación por versión). No contiene rol ni datos sensibles; estado y rol se consultan en cada solicitud. La firma da integridad, no cifra contenido.
+**JWT.** La API emite y verifica el token con HS256 y una clave aleatoria de al menos 32 bytes guardada en el `.env` del servidor (fuera de Git y de React). Se validan firma, algoritmo, emisor (`iss`), destinatario (`aud`) y vencimiento (`exp`). Claims: `sub`, `iss`, `aud`, `iat`, `exp`, `jti` y `ver`. El rol no viaja en el token: se lee de la base en cada solicitud, así un cambio de rol o una desactivación rige de inmediato.
 
-Vigencia: **900 segundos**, para limitar exposición. Sin refresh token: al vencer se inicia sesión de nuevo. Logout incrementa version_sesion en la base y revoca las copias anteriores de la cuenta. Cambios de usuario y baja incrementan versión; una cuenta inactiva se rechaza inmediatamente. Cerrar sesión afecta todos los tokens anteriores de esa cuenta.
+**Vigencia y cierre.** El token dura 15 minutos y no hay refresh token: al vencer se inicia sesión de nuevo. El logout incrementa `version_sesion` en la base y revoca los tokens emitidos antes; lo mismo ocurre al modificar o desactivar una cuenta.
 
-React usa **sessionStorage** para cumplir recarga en EP3. Al iniciar consulta /auth/me y recupera permisos del servidor; limpia al expirar, recibir 401 o cerrar. sessionStorage es accesible ante XSS: se limita vigencia, no se usa HTML sin sanear ni se coloca el token en localStorage; cerrar pestaña elimina sesión. No equivale a una cookie HttpOnly. El carrito sí usa localStorage.
+**Sesión en el frontend.** React guarda el token en `sessionStorage` para cumplir la persistencia tras recargar, y al iniciar consulta `/auth/me` para obtener los permisos vigentes. `sessionStorage` es legible por JavaScript ante un XSS, por eso la vigencia es corta, no se inserta HTML recibido y la sesión se borra al cerrar la pestaña, al cerrar sesión o al recibir 401.
+
+**Permisos.**
 
 | Operación | Cliente | Operadora | Repartidor | Administración |
 |---|---|---|---|---|
-| Catálogo/detalle | Sí | Sí | Sí | Sí |
+| Ver catálogo | Sí | Sí | Sí | Sí |
 | Crear pedido | Propio | No | No | No |
 | Consultar pedidos | Propios | Todos | Asignados | Todos |
 | Asignar repartidor | No | Sí | No | Sí |
-| Cambiar estado | No | Sí | Solo asignado | Sí |
-| Eliminar pendiente | Propio | Sí | No | Sí |
-| Productos/cuentas/roles | No | No | No | Sí |
+| Cambiar estado | No | Sí | Solo asignados | Sí |
+| Eliminar pedido pendiente | Propio | Sí | No | Sí |
+| Productos, cuentas y roles | No | No | No | Sí |
 
-Cambiar el ID no permite consultar cuentas/pedidos ajenos. React acompaña permisos con rutas/menús; el servidor vuelve a comprobarlos. CORS permite orígenes configurados, actualmente http://localhost:5173; nginx usa mismo origen. CORS no es autorización. Logs excluyen contraseñas/tokens y login limita intentos.
+Solo administración asigna roles. Cambiar el identificador en la URL no permite ver ni modificar registros ajenos (403). React oculta menús y rutas según el rol, y el servidor vuelve a comprobar cada permiso.
 
-RDS usa TLS verificado. La demostración solicitada por IP usa HTTP en 8080, limitado por el grupo de seguridad a la red autorizada y con cuentas ficticias de laboratorio. El HTTP remoto no cifra credenciales ni tokens y no es un despliegue de autenticación para producción. Para el acceso cifrado de demostración se conserva el túnel SSH opcional. HTTPS queda contemplado para producción, sin añadir certificados ni puertos nuevos a esta entrega.
+**Otros controles.** Límite de 5 intentos fallidos por cuenta y 20 por IP cada 15 minutos. CORS permite solo los orígenes configurados y no reemplaza la autorización. Los registros ocultan contraseñas y tokens. RDS no es público y la conexión usa TLS verificado. La demostración por IP usa HTTP en el puerto 8080, limitado por el grupo de seguridad y con cuentas ficticias; en producción se exige HTTPS.
 
-## 7. Ejecutar y comprobar
+## 8. Cómo ejecutar
 
-### Desarrollo
+### Local
 
-1. Node.js 24 y PostgreSQL 18; bases gas_el_volcan y gas_el_volcan_test separadas, usuario con permisos.
-2. npm ci.
-3. Copiar .env.example a .env y completar credenciales y clave JWT. RDS: DB_TLS=verify y CA; PostgreSQL en loopback: DB_TLS=local sin CA. El modo local rechaza hosts remotos.
-4. npm run migrar; npm run sembrar con SEMILLA_CONTRASENA_DEMO configurada. No sobrescribe cuentas existentes.
-5. npm start: escucha por defecto en 127.0.0.1:3000. Abrir Swagger y ejecutar React según su README.
-
-Clave JWT: generar localmente con `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. Guardar solo en entorno privado; nunca VITE_.
-
-### EC2: demostración por IP y túnel opcional
-
-**Frontend por IP:** [Gas El Volcán](http://13.222.161.194:8080/). **Documentación viva:** [Swagger](http://13.222.161.194:8080/api/v1/docs/). Ambos accesos se probaron desde el navegador con la nueva IP. El grupo lab-springboot-sg permite 8080 desde la IP autorizada del equipo; al cambiar de red debe actualizarse «Mi IP». No se abrieron 80/443.
-
-Instancia lab-springboot. IP comprobada el 20-nov-2026: **13.222.161.194**; cambia al reiniciar el laboratorio. La llave está fuera del repositorio.
+Requisitos: Node.js 24 y PostgreSQL 18.
 
 ```bash
-ssh -i RUTA_A_LA_LLAVE -N -L 127.0.0.1:8080:127.0.0.1:8080 ubuntu@13.222.161.194
+npm ci
+cp .env.example .env          # completar credenciales, JWT_SECRETO y SEMILLA_CONTRASENA_DEMO
+npm run migrar
+npm run sembrar
+npm start                     # http://localhost:3000/api/v1/docs/
 ```
 
-El siguiente túnel es una alternativa cifrada; mantener su terminal abierta y visitar **http://localhost:8080**. React, API y Swagger comparten origen. Nginx escucha en 127.0.0.1:8080 y en la interfaz EC2 172.31.23.154:8080; Node permanece en loopback:3001. No requiere puertos públicos nuevos ni publicar RDS. SSH cifra el tramo entre equipos; HTTP queda en loopback.
+Generar la clave JWT: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. Para PostgreSQL local usar `DB_TLS=local`; para RDS, `DB_TLS=verify` con el certificado de AWS en `DB_CA_PATH`.
 
-Instalación activa: /home/ubuntu/BackendStackll-EP3-20261120; .env privado con permisos 600. Node 24.19.0 en /home/ubuntu/.local/node-v24.19.0-linux-x64/bin/node. Servicio gas-el-volcan-api.service con override ep3.conf. Se conserva /home/ubuntu/BackendStackll para reversión. React en /var/www/gas-volcan-ep3 y proxy nginx a 3001. Archivos de configuración en deploy/ de ambos repositorios. Antes de reemplazar una versión: instalar dependencias, migrar y probar en base _test; reiniciar solo después de aprobar.
+### EC2
 
-Comprobar desde EC2: `systemctl is-active gas-el-volcan-api`, `sudo nginx -t`, `curl http://127.0.0.1:8080/api/v1/productos`. AWS Academy, EC2 y RDS deben estar activos para presentar; el túnel solo es necesario si se elige el acceso localhost.
+1. Iniciar el laboratorio de AWS Academy y verificar que la instancia EC2 y la base RDS estén activas. La IP pública cambia al reiniciar el laboratorio.
+2. En el grupo de seguridad, permitir el puerto 8080 desde la IP de la red donde se presentará («Mi IP»).
+3. Copiar el proyecto, ejecutar `npm ci --omit=dev`, crear el `.env` privado (permisos 600), `npm run migrar` y `npm run sembrar`.
+4. Instalar el servicio [`deploy/gas-el-volcan-api.service`](deploy/gas-el-volcan-api.service) y la configuración nginx del repositorio del frontend.
+5. Comprobar: `systemctl is-active gas-el-volcan-api`, `sudo nginx -t` y `curl http://127.0.0.1:8080/api/v1/productos`.
 
-## 8. Pruebas reales
+## 9. Pruebas
 
-Configurar .env.test con una base terminada en _test. El ejecutor rechaza otro nombre. Los casos crean/limpian datos ficticios.
+Las pruebas usan `.env.test` con una base cuyo nombre termina en `_test` (el ejecutor rechaza otro nombre).
 
 ```bash
 npm test -- --maxWorkers=1 --no-file-parallelism
@@ -202,60 +202,49 @@ npm run lint
 npm audit --omit=dev
 ```
 
-**20-nov-2026:** 44 pruebas aprobadas en cuatro archivos, local PostgreSQL 18 y EC2/RDS. Lint: 0 errores/advertencias. Auditoría de ejecución: 0 vulnerabilidades detectadas en esa fecha.
+Resultado: **44 pruebas aprobadas** en cuatro archivos, contra PostgreSQL local y EC2/RDS; lint sin errores; 0 vulnerabilidades. El CRUD de usuarios se comprobó además en Postman contra EC2/RDS (7 solicitudes, 0 fallos).
 
 | Caso | Esperado | Resultado |
 |---|---|---|
-| Login válido/inválido/cuenta inexistente | 200 Bearer 900 s / 401 genérico idéntico | Conforme |
-| Registro inválido/duplicado/rol extra | 400/409 sin duplicado/400 | Conforme |
-| Sin token o alterado | 401 | Conforme |
-| Vencido, aud incorrecto, algoritmo no permitido | Rechazo criptográfico | Conforme, unitarias |
-| Rol, cuenta o pedido ajeno | 403 | Conforme |
-| Logout, baja y cambio de rol | Revocación del token anterior | Conforme |
-| CRUD usuarios/productos | Persistencia, 201/200/204 y 404 | Conforme |
-| Último administrador o repartidor ocupado | 409 sin estado inválido | Conforme |
-| Pedido válido/stock insuficiente | 201/409 transaccional | Conforme |
-| Concurrencia de stock limitado | Una venta, otra en conflicto | Conforme |
-| Precio cambiado/sin repartidor/secuencia incorrecta | 409 | Conforme |
-| Eliminar producto usado o pedido en curso | 409 | Conforme |
-| Eliminar pendiente | 204 y stock devuelto | Conforme |
-| Servicio activo RDS | catálogo/OpenAPI 200, sin token 401, login/me 200 | Conforme |
+| Login válido / inválido / cuenta inexistente | 200 con Bearer 900 s / 401 genérico idéntico | Conforme |
+| Registro inválido / duplicado / con rol enviado | 400 / 409 / 400 | Conforme |
+| Ruta protegida sin token o con token alterado | 401 | Conforme |
+| Token vencido, destinatario incorrecto o algoritmo no permitido | Rechazo | Conforme |
+| Rol insuficiente, cuenta o pedido ajeno | 403 | Conforme |
+| Logout, baja y cambio de rol | Token anterior revocado | Conforme |
+| CRUD de usuarios y productos | 201 / 200 / 204 y 404 | Conforme |
+| Último administrador o repartidor con entregas | 409 | Conforme |
+| Pedido válido / stock insuficiente / precio cambiado | 201 / 409 sin cambios | Conforme |
+| Dos compras simultáneas con stock limitado | Una se guarda, la otra 409 | Conforme |
+| En camino sin repartidor / secuencia incorrecta | 409 | Conforme |
+| Eliminar producto con pedidos o pedido en curso | 409 | Conforme |
+| Eliminar pedido pendiente | 204 y stock devuelto | Conforme |
 
-React: **30 pruebas, 14 archivos**, lint sin errores y compilación correcta. Cobertura global de instrucciones: **33,08 %**, no cobertura completa. Navegador: registro, recarga, confirmación, asignación, entrega/cobro, bloqueo por rol, alta/edición/baja de personal y CRUD de producto. Tras reiniciar el backend local, el pedido entregado permaneció. Catálogo a 360/768/1280 px sin desbordamiento de página. Manual e integración se entregan separados del código.
-
-Pendientes: Drive con acceso docente verificado, HTTPS público, ensayo individual y carga en AVA. No se acreditan mediante estas pruebas.
-
-## 9. Plan y seguimiento
-
-Plan de dos semanas: base del 11 de noviembre (datos, autenticación, catálogo lectura); incremento del 20 completa usuarios, catálogo, pedidos, React y documentación EP3. No se alteran fechas de commits.
-
-Dificultades resueltas: IP EC2 cambiante, Node 24, DTO entre React/SQL, conflicto FK al borrar producto usado, y separación de precio mostrado/cálculo del servidor. Próximos pasos académicos: ensayar explicación con código y cargar AVA antes del 29-nov a las 23:59; cierre de usuarios 22-nov a las 23:59. Fecha de presentación por confirmar en el curso.
+**Pendiente:** HTTPS público y enlace de Drive con acceso de lectura para el docente.
 
 ## 10. Checklist Guía 19
 
-- [x] Backend separado, enlaces recíprocos e identificación del caso/integrante.
-- [x] Tecnología, EC2, base de datos y herramientas justificadas.
-- [x] ER actualizado, restricciones y explicación sin diccionario.
-- [ ] Acceso docente verificado en Drive.
-- [x] Capas y responsabilidad del integrante explicadas.
-- [x] Estructura, conexión y endpoints con estado real.
-- [x] OpenAPI/Swagger y relación con pantallas.
-- [x] Hash, JWT, roles, vigencia y revocación con fuentes.
-- [x] Secuencia propia con rechazos.
-- [x] Pruebas reales separadas de pendientes.
-- [x] Ejecución reproducible y plan de dos semanas.
-- [ ] Integrante ha ensayado todas las decisiones y el código.
+- [x] Repositorio nuevo para el backend y frontend separado.
+- [x] README con proyecto, caso, alcance e integrante.
+- [x] Enlaces cruzados entre los README del backend y del frontend.
+- [x] Tecnología y ejecución en EC2 justificadas.
+- [x] Base de datos y diagrama entidad-relación actualizados, sin diccionario de datos.
+- [ ] Diagramas en Drive con enlace directo y acceso de lectura para el docente.
+- [x] Responsabilidades del backend y del integrante.
+- [x] Estructura, conexión a datos y endpoints con estado real.
+- [x] OpenAPI/Swagger con instrucciones para consultar y probar.
+- [x] Operaciones de la API relacionadas con las pantallas del frontend.
+- [x] Protección de contraseñas investigada y justificada, sin credenciales reales.
+- [x] Flujo JWT y permisos con controles implementados y pendientes.
+- [x] Diagrama de secuencia propio con casos de rechazo.
+- [x] Pruebas reales separadas de los casos pendientes.
+- [x] Pasos para ejecutar, desplegar y comprobar.
 
 ## 11. Fuentes
 
-- [OWASP Password Storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html): Argon2id y sus parámetros.
-- [OWASP REST Security](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html): JWT, permisos y transporte.
-- [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519) y [RFC 8725](https://www.rfc-editor.org/rfc/rfc8725).
-- [PostgreSQL 18](https://www.postgresql.org/docs/18/): transacciones, restricciones y UUID.
-- [AWS: TLS con RDS PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html).
-- [Swagger](https://swagger.io/docs/), [Axios](https://axios-http.com/docs/intro), [jose](https://github.com/panva/jose), [node-argon2](https://github.com/ranisalt/node-argon2).
-- DSY1104: Guías 19/20, solicitud avance/EP3, caso Forma C y ERS V2/V3. El texto recibido de la Guía 19 conserva un pie con número 18; se sigue la numeración indicada en el curso.
-
-Validación final del incremento: se corrigió el detalle privado retenido tras perder sesión, el error de alta oculto detrás del modal y la carga de recursos de Swagger por IP HTTP. Las regresiones se observaron fallar antes y aprobar después. OpenAPI declara respuestas y límites específicos por operación. El frontend final pasó 30 pruebas con cobertura real de 33,08 % de instrucciones; no se alteraron exclusiones.
-
-Comprobación adicional del estado Listo: Postman Runtime/Newman ejecutó login, listado, alta, modificación, consulta, desactivación y lectura de la baja persistida en EC2/RDS: 7 solicitudes, 7 comprobaciones y 0 fallos. Se usó personal ficticio y las credenciales/tokens no se imprimieron.
+- [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+- [OWASP REST Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html)
+- [RFC 7519 (JWT)](https://www.rfc-editor.org/rfc/rfc7519) y [RFC 8725 (buenas prácticas JWT)](https://www.rfc-editor.org/rfc/rfc8725)
+- [Documentación de PostgreSQL 18](https://www.postgresql.org/docs/18/)
+- [AWS: TLS con RDS PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html)
+- [Swagger](https://swagger.io/docs/), [jose](https://github.com/panva/jose), [node-argon2](https://github.com/ranisalt/node-argon2), [node-postgres](https://node-postgres.com/)
