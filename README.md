@@ -7,8 +7,8 @@ API REST del sistema de pedidos de gas licuado de la Distribuidora de Gas El Vol
 | Asignatura | DSY1104 Desarrollo Fullstack II · Duoc UC · Sección 006D · 2026 |
 | Integrante | Vicente Hueichapan Poblete |
 | Frontend | [ProtecoFullstackllVolcan](https://github.com/vicenteehueichapan-boop/ProtecoFullstackllVolcan) |
-| Aplicación desplegada | http://3.208.18.46:8080/ |
-| Swagger (documentación viva) | http://3.208.18.46:8080/api/v1/docs/ |
+| Aplicación desplegada | http://98.93.41.179:8080/ |
+| Swagger (documentación viva) | http://98.93.41.179:8080/api/v1/docs/ |
 
 ## 1. Alcance
 
@@ -100,7 +100,7 @@ Vicente Hueichapan Poblete desarrolló el análisis, el modelo de datos, el back
 
 Base `/api/v1`. El contrato completo (parámetros, ejemplos ficticios, respuestas, errores y permisos) está en [`docs/openapi.yaml`](docs/openapi.yaml) y se publica con Swagger UI.
 
-- **Swagger en EC2:** http://3.208.18.46:8080/api/v1/docs/ · OpenAPI JSON: http://3.208.18.46:8080/api/v1/openapi.json
+- **Swagger en EC2:** http://98.93.41.179:8080/api/v1/docs/ · OpenAPI JSON: http://98.93.41.179:8080/api/v1/openapi.json
 - **Swagger local:** http://localhost:3000/api/v1/docs/
 - Para probar una ruta protegida: ejecutar `POST /auth/login`, copiar `accessToken`, presionar **Authorize** y pegarlo.
 
@@ -168,7 +168,7 @@ Con credenciales incorrectas la respuesta es el mismo 401, exista o no la cuenta
 
 Solo administración asigna roles. Cambiar el identificador en la URL no permite ver ni modificar registros ajenos (403). React oculta menús y rutas según el rol, y el servidor vuelve a comprobar cada permiso.
 
-**Otros controles.** Límite de 5 intentos fallidos por cuenta y 20 por IP cada 15 minutos. CORS permite solo los orígenes configurados y no reemplaza la autorización. Los registros ocultan contraseñas y tokens. RDS no es público y la conexión usa TLS verificado. La demostración por IP usa HTTP en el puerto 8080, limitado por el grupo de seguridad y con cuentas ficticias; en producción se exige HTTPS.
+**Otros controles.** Límite de 5 intentos fallidos por cuenta y 20 por IP cada 15 minutos. CORS permite solo los orígenes configurados y no reemplaza la autorización. Los registros ocultan contraseñas y tokens. RDS no es público y la conexión usa TLS verificado. Para la demostración, el grupo de seguridad abre solo el puerto 8080 (HTTP) a cualquier IP, con cuentas ficticias; SSH queda limitado a la IP del integrante y RDS no tiene acceso público. En producción se exige HTTPS.
 
 ## 8. Cómo ejecutar
 
@@ -189,7 +189,7 @@ Generar la clave JWT: `node -e "console.log(require('crypto').randomBytes(32).to
 ### EC2
 
 1. Iniciar el laboratorio de AWS Academy y verificar que la instancia EC2 y la base RDS estén activas. La IP pública cambia al reiniciar el laboratorio.
-2. En el grupo de seguridad, permitir el puerto 8080 desde la IP de la red donde se presentará («Mi IP»).
+2. En el grupo de seguridad, permitir el puerto 8080 desde cualquier IPv4 (`0.0.0.0/0`) para que la página abra desde cualquier red. SSH (22) se mantiene solo para «Mi IP».
 3. Copiar el proyecto, ejecutar `npm ci --omit=dev`, crear el `.env` privado (permisos 600), `npm run migrar` y `npm run sembrar`.
 4. Instalar el servicio [`deploy/gas-el-volcan-api.service`](deploy/gas-el-volcan-api.service) y la configuración nginx del repositorio del frontend.
 5. Comprobar: `systemctl is-active gas-el-volcan-api`, `sudo nginx -t` y `curl http://127.0.0.1:8080/api/v1/productos`.
