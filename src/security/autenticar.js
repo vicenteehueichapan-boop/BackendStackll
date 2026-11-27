@@ -7,26 +7,30 @@ const sesionInvalida = () => new ErrorApi(401, 'SESION_INVALIDA', 'La sesión no
 
 // Exige «Authorization: Bearer <token>». Verifica el token y vuelve a leer al usuario:
 // una cuenta deshabilitada o una sesión cerrada (versión distinta) se rechazan aunque el token no haya vencido.
-export async function autenticar(req, res, next) {
-  const [tipo, token] = (req.get('authorization') ?? '').split(' ');
-  if (tipo !== 'Bearer' || !token) {
-    throw new ErrorApi(401, 'NO_AUTENTICADO', 'Debes iniciar sesión para usar esta ruta.');
-  }
+export function crearAutenticador(buscarPorId, audiencia) {
+  return async (req, res, next) => {
+    const [tipo, token] = (req.get('authorization') ?? '').split(' ');
+    if (tipo !== 'Bearer' || !token) {
+      throw new ErrorApi(401, 'NO_AUTENTICADO', 'Debes iniciar sesión para usar esta ruta.');
+    }
 
-  let afirmaciones;
-  try {
-    afirmaciones = await verificarToken(token);
-  } catch (error) {
-    registro.info({ motivo: error.code }, 'token rechazado');
-    throw sesionInvalida();
-  }
+    let afirmaciones;
+    try {
+      afirmaciones = await verificarToken(token, audiencia);
+    } catch (error) {
+      registro.info({ motivo: error.code }, 'token rechazado');
+      throw sesionInvalida();
+    }
 
-  const usuario = await usuariosRepository.buscarPorId(afirmaciones.sub);
-  if (!usuario || usuario.estado !== 'activo' || usuario.versionSesion !== afirmaciones.ver) {
-    registro.info({ usuarioId: afirmaciones.sub }, 'sesión revocada o cuenta no activa');
-    throw sesionInvalida();
-  }
+    const usuario = await buscarPorId(afirmaciones.sub);
+    if (!usuario || usuario.estado !== 'activo' || usuario.versionSesion !== afirmaciones.ver) {
+      registro.info({ usuarioId: afirmaciones.sub }, 'sesión revocada o cuenta no activa');
+      throw sesionInvalida();
+    }
 
-  req.usuario = usuario;
-  next();
+    req.usuario = usuario;
+    next();
+  };
 }
+
+export const autenticar = crearAutenticador(usuariosRepository.buscarPorId);

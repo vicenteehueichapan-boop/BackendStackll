@@ -186,6 +186,32 @@ npm start                     # http://localhost:3000/api/v1/docs/
 
 Generar la clave JWT: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. Para PostgreSQL local usar `DB_TLS=local`; para RDS, `DB_TLS=verify` con el certificado de AWS en `DB_CA_PATH`.
 
+### Aplicación móvil Kaiju (DSY1105)
+
+[Kaiju](https://github.com/vicenteehueichapan-boop/AplicacionKaiju) usa este mismo servicio Express y la misma conexión PostgreSQL. La migración `1731340800001_usuarios-kaiju.sql` crea `kaiju_usuario` con los perfiles Administrador, Vendedor y Encargado de inventario. Las cuentas de Kaiju tienen su propia tabla y audiencia JWT para que sus permisos no se crucen con Gas El Volcán. Los productos y movimientos de Kaiju se quedan en Room, en el dispositivo.
+
+Para una demostración local, prepara una base vacía en PostgreSQL 18 y completa `.env` con `DB_HOST=127.0.0.1`, `DB_TLS=local`, `DIRECCION_ESCUCHA=127.0.0.1`, `PUERTO=3000`, las credenciales de PostgreSQL y una clave JWT aleatoria. Completa también `KAIJU_ADMIN_CORREO`, `KAIJU_ADMIN_NOMBRE`, `KAIJU_ADMIN_APELLIDOS` y `KAIJU_ADMIN_CONTRASENA` con una cuenta de demostración. En Windows se puede usar `npm.cmd`.
+
+```bash
+npm ci
+npm run migrar
+npm run kaiju:admin
+npm start
+```
+
+El comando de alta se ejecuta una vez por cuenta. Después del alta se puede quitar la contraseña de administrador del archivo de entorno. Los demás perfiles se crean en **Gestionar usuarios** desde Kaiju. Desde el equipo con el emulador, `adb reverse tcp:3000 tcp:3000` conecta el APK de EA3 con el servicio local.
+
+| Método y ruta | Acceso | Respuesta |
+|---|---|---|
+| `POST /api/v1/kaiju/auth/login` | Correo y contraseña | `200` con token, vigencia y cuenta |
+| `POST /api/v1/kaiju/auth/logout` | Cuenta autenticada | `204`, revoca las sesiones de la cuenta |
+| `GET /api/v1/kaiju/usuarios` | Administrador | `200`, listado |
+| `POST /api/v1/kaiju/usuarios` | Administrador | `201`, cuenta creada |
+| `PATCH /api/v1/kaiju/usuarios/{id}` | Administrador | `200`, cuenta editada |
+| `DELETE /api/v1/kaiju/usuarios/{id}` | Administrador | `204`, elimina la cuenta de Kaiju |
+
+Las contraseñas se almacenan con Argon2id. El backend comprueba el perfil en cada operación, rechaza correos duplicados y protege el acceso del administrador activo. Para el uso remoto del APK, sirve la API sobre HTTPS y configura su URL al compilar. Swagger se encuentra en `/api/v1/docs/`.
+
 ### EC2
 
 1. Iniciar el laboratorio de AWS Academy y verificar que la instancia EC2 y la base RDS estén activas. La IP pública cambia al reiniciar el laboratorio.
