@@ -9,12 +9,12 @@ const clave = Buffer.from(entorno.JWT_SECRETO, 'base64');
 
 // El token solo identifica (sub) y fija su versión de sesión (ver). El rol NO viaja en él:
 // se lee de la base en cada solicitud, así un cambio de rol o una cuenta deshabilitada rige al instante.
-export function emitirToken(usuario) {
+export function emitirToken(usuario, audiencia = entorno.JWT_AUDIENCIA) {
   return new SignJWT({ ver: usuario.versionSesion })
     .setProtectedHeader({ alg: ALGORITMO, typ: 'JWT' })
     .setSubject(usuario.id)
     .setIssuer(entorno.JWT_EMISOR)
-    .setAudience(entorno.JWT_AUDIENCIA)
+    .setAudience(audiencia)
     .setIssuedAt()
     .setExpirationTime(`${entorno.JWT_DURACION_SEGUNDOS}s`)
     .setJti(randomUUID())
@@ -23,11 +23,11 @@ export function emitirToken(usuario) {
 
 // Comprueba firma, algoritmo permitido, emisor, destinatario y vencimiento.
 // Decodificar sin verificar no basta: un token alterado o vencido lanza error.
-export async function verificarToken(token) {
+export async function verificarToken(token, audiencia = entorno.JWT_AUDIENCIA) {
   const { payload } = await jwtVerify(token, clave, {
     algorithms: [ALGORITMO],
     issuer: entorno.JWT_EMISOR,
-    audience: entorno.JWT_AUDIENCIA,
+    audience: audiencia,
     requiredClaims: ['sub', 'iat', 'exp', 'jti', 'ver'],
   });
   return payload;

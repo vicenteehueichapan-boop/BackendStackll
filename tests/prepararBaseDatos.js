@@ -14,7 +14,7 @@ export async function setup() {
   const cliente = await pool.connect();
   try {
     await migrarHaciaArriba(cliente);
-    await cliente.query(`TRUNCATE linea_pedido, pedido, perfil_cliente, usuario, producto, categoria,
+    await cliente.query(`TRUNCATE linea_pedido, pedido, perfil_cliente, usuario, kaiju_usuario, producto, categoria,
                          zona_despacho, mensaje_contacto RESTART IDENTITY CASCADE`);
     await sembrarCatalogo(cliente);
   } finally {
