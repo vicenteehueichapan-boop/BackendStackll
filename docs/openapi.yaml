@@ -14,6 +14,8 @@ tags:
   - name: Productos
   - name: Pedidos
   - name: Referencias
+  - name: Kaiju
+    description: Inicio de sesión y gestión de usuarios de la app móvil.
 components:
   securitySchemes:
     bearerAuth:
@@ -22,7 +24,55 @@ components:
       bearerFormat: JWT
       description: Token de POST /api/v1/auth/login; vigencia 15 minutos. El cierre de sesión y los
         cambios de usuario revocan los tokens.
+    kaijuAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token emitido por POST /api/v1/kaiju/auth/login.
   schemas:
+    KaijuRol:
+      type: string
+      enum: [administrador, vendedor, encargado_inventario]
+    KaijuUsuario:
+      type: object
+      required: [id, nombre, apellidos, correo, rol]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        apellidos:
+          type: string
+        correo:
+          type: string
+          format: email
+        rol:
+          $ref: "#/components/schemas/KaijuRol"
+    KaijuEdicion:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 80
+        apellidos:
+          type: string
+          minLength: 2
+          maxLength: 80
+        correo:
+          type: string
+          format: email
+          maxLength: 254
+        contrasena:
+          type: string
+          minLength: 8
+          maxLength: 128
+          writeOnly: true
+        rol:
+          $ref: "#/components/schemas/KaijuRol"
     Error:
       type: object
       required:
@@ -573,6 +623,121 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
 paths:
+  /api/v1/kaiju/auth/login:
+    post:
+      tags: [Kaiju]
+      summary: Iniciar sesión en Kaiju
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngresoEntrada"
+      responses:
+        "200":
+          description: Sesión iniciada y perfil reconocido.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accessToken, expiresIn, usuario]
+                properties:
+                  accessToken:
+                    type: string
+                  expiresIn:
+                    type: integer
+                    description: Vigencia del token en segundos.
+                  usuario:
+                    $ref: "#/components/schemas/KaijuUsuario"
+        "400": { $ref: "#/components/responses/Error400" }
+        "401": { $ref: "#/components/responses/Error401" }
+        "429": { $ref: "#/components/responses/Error429" }
+  /api/v1/kaiju/auth/logout:
+    post:
+      tags: [Kaiju]
+      summary: Cerrar la sesión de Kaiju
+      security: [{ kaijuAuth: [] }]
+      responses:
+        "204": { description: Sesiones revocadas. }
+        "401": { $ref: "#/components/responses/Error401" }
+  /api/v1/kaiju/usuarios:
+    get:
+      tags: [Kaiju]
+      summary: Listar usuarios como administrador
+      security: [{ kaijuAuth: [] }]
+      responses:
+        "200":
+          description: Usuarios registrados en Kaiju.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KaijuUsuario"
+        "401": { $ref: "#/components/responses/Error401" }
+        "403": { $ref: "#/components/responses/Error403" }
+    post:
+      tags: [Kaiju]
+      summary: Crear un usuario como administrador
+      security: [{ kaijuAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/KaijuEdicion"
+                - required: [nombre, apellidos, correo, contrasena, rol]
+      responses:
+        "201":
+          description: Usuario creado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KaijuUsuario"
+        "400": { $ref: "#/components/responses/Error400" }
+        "401": { $ref: "#/components/responses/Error401" }
+        "403": { $ref: "#/components/responses/Error403" }
+        "409": { $ref: "#/components/responses/Error409" }
+  /api/v1/kaiju/usuarios/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [Kaiju]
+      summary: Editar un usuario como administrador
+      security: [{ kaijuAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KaijuEdicion"
+      responses:
+        "200":
+          description: Usuario actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KaijuUsuario"
+        "400": { $ref: "#/components/responses/Error400" }
+        "401": { $ref: "#/components/responses/Error401" }
+        "403": { $ref: "#/components/responses/Error403" }
+        "404": { $ref: "#/components/responses/Error404" }
+        "409": { $ref: "#/components/responses/Error409" }
+    delete:
+      tags: [Kaiju]
+      summary: Eliminar un usuario como administrador
+      security: [{ kaijuAuth: [] }]
+      responses:
+        "204": { description: Usuario eliminado. }
+        "400": { $ref: "#/components/responses/Error400" }
+        "401": { $ref: "#/components/responses/Error401" }
+        "403": { $ref: "#/components/responses/Error403" }
+        "404": { $ref: "#/components/responses/Error404" }
+        "409": { $ref: "#/components/responses/Error409" }
   /api/v1/auth/register:
     post:
       tags:

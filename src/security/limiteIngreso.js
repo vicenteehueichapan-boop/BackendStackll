@@ -8,24 +8,26 @@ const responderLimite = (req, res) => res.status(429).json({
 
 // Dos límites a la vez: por IP (un atacante desde un equipo) y por cuenta (el mismo correo
 // atacado desde muchas IP). Solo cuentan los intentos fallidos.
-export const limitePorIp = rateLimit({
+const opciones = {
   windowMs: VENTANA_MS,
-  limit: 20,
   skipSuccessfulRequests: true,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   handler: responderLimite,
-});
+};
 
-export const limitePorCuenta = rateLimit({
-  windowMs: VENTANA_MS,
-  limit: 5,
-  skipSuccessfulRequests: true,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  keyGenerator: (req) => {
-    const correo = typeof req.body?.correo === 'string' ? req.body.correo.trim().toLowerCase() : '';
-    return correo ? `cuenta:${correo}` : `ip:${ipKeyGenerator(req.ip)}`;
-  },
-  handler: responderLimite,
-});
+export function crearLimitesIngreso() {
+  return {
+    limitePorIp: rateLimit({ ...opciones, limit: 20 }),
+    limitePorCuenta: rateLimit({
+      ...opciones,
+      limit: 5,
+      keyGenerator: (req) => {
+        const correo = typeof req.body?.correo === 'string' ? req.body.correo.trim().toLowerCase() : '';
+        return correo ? `cuenta:${correo}` : `ip:${ipKeyGenerator(req.ip)}`;
+      },
+    }),
+  };
+}
+
+export const { limitePorIp, limitePorCuenta } = crearLimitesIngreso();

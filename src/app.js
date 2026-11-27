@@ -6,6 +6,7 @@ import { entorno } from './config/entorno.js';
 import { registro } from './config/registro.js';
 import { manejadorErrores, rutaNoEncontrada } from './errores/manejadorErrores.js';
 import { authRoutes } from './routes/auth.routes.js';
+import { kaijuRoutes } from './routes/kaiju.routes.js';
 import { documentacionRoutes } from './routes/documentacion.routes.js';
 import { productosRoutes } from './routes/productos.routes.js';
 import { usuariosRoutes } from './routes/usuarios.routes.js';
@@ -30,6 +31,7 @@ export function crearApp() {
 
   app.use('/api/v1', documentacionRoutes);
   app.use('/api/v1/auth', authRoutes);
+  app.use('/api/v1/kaiju', kaijuRoutes);
   app.use('/api/v1/productos', productosRoutes);
   app.use('/api/v1/usuarios', usuariosRoutes);
   app.use('/api/v1/pedidos', pedidosRoutes);
